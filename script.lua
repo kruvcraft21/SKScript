@@ -12,6 +12,7 @@ lang = {
         "РАЗБЛОКИРОВАТЬ МОТОЦИКЛ",
         --"ДОБАВИТЬ ЗДОРОВЬЯ, БРОНИ, ЭНЕРГИИ",
         'ОГРОМНЫЙ УРОН',
+        'УБРАТЬ КОЛИЧЕСТВО ПОКУПОК У ПРОДАВЦА',
         "УБРАТЬ КОЛИЧЕСТВО ПОПЫТОК BOSS RUSH",
         "УСТАНОВИТЬ КОЛИЧЕСТВО СЕМЯН",
         "УСТАНОВИТЬ КОЛИЧЕСТВО МАТЕРИАЛОВ",
@@ -35,6 +36,7 @@ lang = {
         "UNLOCK MOTORCYCLE",
         --'ADD HEALTH, ARMOR, ENERGY',
         'HUGE DAMAGE',
+        'RESET SELLER',
         "REMOVE THE NUMBER OF BOSS RUSH ATTEMPTS",
         'SET COUNT SEEDS',
         'SET MATERIALS COUNT',
@@ -457,6 +459,16 @@ Unity = {
             end
         end
         return retaddress,'true'
+    end,
+    From = function (self, a)
+        return setmetatable({address = a, mClass = self}, {
+            __index = function(self, key)
+                local check = switch((self.address and self.mClass) and (self.mClass[key] and 1 or -1) or 0 , {[0] = 'Не все поля заполнены', [-1] = 'В таблице нет поля ' .. key})
+                return check and error(check) or ((type(self.mClass[key]) == 'function') 
+                    and (function(self, ...) return self.mClass[key](self.mClass, self.address, ...) end)
+                    or self.mClass[key])
+            end
+        })
     end
 }
 
@@ -485,7 +497,7 @@ EnumClass = {
     From = function (self, a)
         return setmetatable({address = a, mClass = self}, {
             __index = function(self, key)
-                local check = switch((self.address and self.mClass) and (self.mClass[key] and 1 or -1) or 0, {[0] = 'Не все поля заполнены', [-1] = 'В таблице нет поля ' .. key})
+                local check = switch((self.address and self.mClass) and (self.mClass[key] and 1 or -1) or 0 , {[0] = 'Не все поля заполнены', [-1] = 'В таблице нет поля ' .. key})
                 return check and error(check) or ((type(self.mClass[key]) == 'function') 
                     and (function(self, ...) return self.mClass[key](self.mClass, self.address, ...) end)
                     or self.mClass[key])
@@ -627,7 +639,6 @@ function Massiv:CreateMassiv(address,head,T,Mtable)
             address = address + self[T].firstStep + self[T].skip + (self[T].step * i),
             flags = self[T].size,
             value = Mtable[i]
-            
         }
     end
     gg.setValues(SetMass)
@@ -775,11 +786,20 @@ RGPetInfo = SetUnityClass({
     end
 })
 
+RoomComodityData = SetUnityClass({
+    count = platform and 0x18 or 0xc, 
+    GetCount = function(self, address)
+        return gg.getValues({{address = address + self.count, flags = gg.TYPE_DWORD}})[1].value
+    end
+})
+
 ItemData = SetUnityClass({
     tokenTickets = platform and 0x58 or 0x30,
     materials = platform and 0x50 or 0x2C,
     seeds = platform and 0x48 or 0x28,
     bossrush_time = platform and 0xa0 or 0x54,
+    sellerRefreshTime = platform and 0x18 or 0xc,
+    commodities = platform and 0x20 or 0x14,
     weaponAdd = {
         'weapon_276',
         'weapon_276',
@@ -844,6 +864,23 @@ ItemData = SetUnityClass({
     EditTimesBossRush = function(self)
         for k,v in ipairs(self:GetLocalInstance()) do
             gg.setValues({{address = v.value + self.bossrush_time, flags = gg.TYPE_DWORD, value = 0}})
+        end
+    end,
+    ResetSeller = function(self)
+        for k,v in ipairs(self:GetLocalInstance()) do
+            gg.setValues({{address = v.value + self.sellerRefreshTime, flags = gg.TYPE_DWORD, value = 0}})
+            local items = {}
+            for n,cl in ipairs(Massiv:From(List:GetLink(gg.getValues({{address = v.value + self.commodities, flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value)):GetAllElement('link')) do
+                local item = RoomComodityData:From(cl.value)
+                if (item:GetCount() == 0) then 
+                    items[#items + 1] = {
+                        address = item.address + item.mClass.count,
+                        value = 1,
+                        flags = gg.TYPE_DWORD
+                    }
+                end
+            end
+            gg.setValues(items)
         end
     end
 })
@@ -1470,6 +1507,10 @@ functions = {
     ["REMOVE THE NUMBER OF BOSS RUSH ATTEMPTS"] = function()
         Protect:Call(ItemData.EditTimesBossRush, ItemData)
         -- ItemData:EditTimesBossRush()
+        gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
+    end,
+    ['RESET SELLER'] = function()
+        Protect:Call(ItemData.ResetSeller, ItemData)
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
     end
 }
