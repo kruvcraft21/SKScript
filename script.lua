@@ -627,6 +627,7 @@ function Massiv:CreateMassiv(address,head,T,Mtable)
             address = address + self[T].firstStep + self[T].skip + (self[T].step * i),
             flags = self[T].size,
             value = Mtable[i]
+            
         }
     end
     gg.setValues(SetMass)
