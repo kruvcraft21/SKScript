@@ -13,6 +13,7 @@ lang = {
         --"ДОБАВИТЬ ЗДОРОВЬЯ, БРОНИ, ЭНЕРГИИ",
         'ОГРОМНЫЙ УРОН',
         'УБРАТЬ КОЛИЧЕСТВО ПОКУПОК У ПРОДАВЦА',
+        'ЗАРЯДИТЬ ВОЛНОВОД',
         "УБРАТЬ КОЛИЧЕСТВО ПОПЫТОК BOSS RUSH",
         "УСТАНОВИТЬ КОЛИЧЕСТВО СЕМЯН",
         "УСТАНОВИТЬ КОЛИЧЕСТВО МАТЕРИАЛОВ",
@@ -37,6 +38,7 @@ lang = {
         --'ADD HEALTH, ARMOR, ENERGY',
         'HUGE DAMAGE',
         'RESET SELLER',
+        'CHARGE THE WAVEGUIDE',
         "REMOVE THE NUMBER OF BOSS RUSH ATTEMPTS",
         'SET COUNT SEEDS',
         'SET MATERIALS COUNT',
@@ -687,6 +689,8 @@ Dictionary = SetEnumClass({
     string = {
         keySize = platform and 0x8 or 0x4,
         int = {
+            valueSize = 0x4,
+            missKey = platform and 0x10 or 0xC,
             firstStep = platform and 0x18 or 0xC,
             step = platform and 0x18 or 0x10
         },
@@ -742,6 +746,26 @@ function Dictionary:SetAllItemStringInt(dic,value)
             }
         end
         gg.setValues(intItem)
+    end
+end
+
+function Dictionary:SetItemStringInt(dic, key, val)
+    local numItem = self:GetNumItem(dic)
+    local linkmass = self:GetLink(dic)
+    if numItem > 0 and numItem < 1000 then
+        for i = 1, numItem do
+            local tmp = {
+                address = linkmass + self.string.int.firstStep + (self.string.int.missKey * i) + (self.string.keySize * (i - 1)),
+                flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD,
+            }
+            if (ReadString(gg.getValues({tmp})[1].value) == key) then
+                gg.setValues({{
+                    address = linkmass + self.string.int.firstStep + ((self.string.int.missKey + self.string.keySize) * i),
+                    flags = gg.TYPE_DWORD,
+                    value = val
+                }})
+            end
+        end
     end
 end
 
@@ -949,9 +973,15 @@ WeaponsConfig = SetUnityClass({
 
 StatisticData = SetUnityClass({
     object2ObtainTime = platform and 0x20 or 0x10,
+    event2Count = platform and 0x28 or 0x14,
     SetTimesWeapon = function(self,value)
         for k,v in ipairs(self:GetInstance()) do
             Dictionary:SetAllItemStringInt(gg.getValues({{address = v.address + self.object2ObtainTime,flags = v.flags}})[1].value,value)
+        end
+    end,
+    SetPower = function(self)
+        for k,v in ipairs(self:GetInstance()) do
+            Dictionary:From(gg.getValues({{address = v.address + self.event2Count, flags = v.flags}})[1].value):SetItemStringInt('hero_char_useable_value', 100)
         end
     end
 })
@@ -1511,6 +1541,10 @@ functions = {
     ['RESET SELLER'] = function()
         Protect:Call(ItemData.ResetSeller, ItemData)
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
+    end,
+    ['CHARGE THE WAVEGUIDE'] = function()
+        Protect:Call(StatisticData.SetPower, StatisticData) 
+        gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")   
     end
 }
 
