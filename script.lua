@@ -790,6 +790,9 @@ RoomComodityData = SetUnityClass({
     count = platform and 0x18 or 0xc, 
     GetCount = function(self, address)
         return gg.getValues({{address = address + self.count, flags = gg.TYPE_DWORD}})[1].value
+    end,
+    GetTabelForReset = function(self, add)
+        return {address = add + self.count, value = 1, flags = gg.TYPE_DWORD}
     end
 })
 
@@ -873,11 +876,7 @@ ItemData = SetUnityClass({
             for n,cl in ipairs(Massiv:From(List:GetLink(gg.getValues({{address = v.value + self.commodities, flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value)):GetAllElement('link')) do
                 local item = RoomComodityData:From(cl.value)
                 if (item:GetCount() == 0) then 
-                    items[#items + 1] = {
-                        address = item.address + item.mClass.count,
-                        value = 1,
-                        flags = gg.TYPE_DWORD
-                    }
+                    items[#items + 1] = item:GetTabelForReset()
                 end
             end
             gg.setValues(items)
