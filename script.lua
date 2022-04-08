@@ -217,6 +217,7 @@ foril2cpp = {
         return ret
     end
 }
+
 if #libil == 0 then
     local splitconf = gg.getRangesList('split_config.')
     gg.setRanges(gg.REGION_CODE_APP)
@@ -789,15 +790,16 @@ RGCharacterInfo = SetUnityClass({
     end,
     skin_list = platform and 0x28 or 0x1C,
     SetSkinPrice = function(self,num)
+        local skins = {}
         for k,v in ipairs(self:GetInstance()) do
-            for item,table in ipairs(Massiv:From(gg.getValues({{address = v.address + self.skin_list,flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value):GetAllElement('int')) do
-                gg.setValues({{
-                    address = table.address, 
-                    flags = table.flags,
-                    value = (item ~= 1 and table.value ~= 1) and num or table.value
-                }})
+            for item,tab in ipairs(Massiv:From(gg.getValues({{address = v.address + self.skin_list,flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value):GetAllElement('int')) do
+                if (item ~= 1 and tab.value ~= 1) then 
+                    tab.value = num 
+                    skins[#skins + 1] = tab
+                end
             end
         end
+        gg.setValues(skins)
     end
 })
 
