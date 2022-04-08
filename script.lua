@@ -73,6 +73,7 @@ langClass = {
         RGGameSceneManager = 'Игровая сцена найдена',
         RGHand = 'Рука найдена',
         WeaponInfoRow = 'Оружия найдены',
+        WeaponInfo = 'Оружия найдены',
         RGSaveManager = 'Сохранения найдены',
         Emtry = 'Пусто',
         ErrorLib = 'Game Guardian не нашёл нужную библиотеку. Скрипт запустится, но будет работать частично некорректно',
@@ -99,6 +100,7 @@ langClass = {
         RGGameSceneManager = 'Game scene found',
         RGHand = 'Hand found',
         WeaponInfoRow = 'Weapons found',
+        WeaponInfo = 'Weapons found',
         RGSaveManager = 'Saves were found',
         Emtry = 'Emtry',
         ErrorLib = "Game Guardian didn't find the right library. The script will run, but it will work partially incorrectly",
@@ -1009,21 +1011,27 @@ TermData = SetUnityClass({
     end
 })
 
-WeaponInfoRow = SetUnityClass({
-    forgeable = platform and 0x39 or 0x21,
-    IsRun = false,
-    SetForgeAble = function (self)
-        for k,v in ipairs(self:GetInstance()) do
-            v = {
-                address = v.address + self.forgeable,
-                flags = gg.TYPE_BYTE
-            }
-            if gg.getValues({v})[1].value == 0 then
-                v.value = 1
-                gg.setValues({v})
+WeaponInfo = SetUnityClass({
+    weapons = platform and 0x10 or 0x8,
+    UnlockAllWeapon = function(self)
+        local items = {}
+        for k,v in ipairs(self:GetLocalInstance()) do
+            for key,weapon in ipairs(Massiv:From(List:GetLink(gg.getValues({{address = v.value + self.weapons, flags = v.flags}})[1].value)):GetAllElement('link')) do
+                local item = WeaponInfoRow:From(weapon.value)
+                if (item:Getforgeable() == 0) then items[#items + 1] = item:GetTableforforgeable() end
             end
         end
-        self.IsRun = true
+        gg.setValues(items)
+    end
+})
+
+WeaponInfoRow = SetUnityClass({
+    forgeable = platform and 0x39 or 0x21,
+    Getforgeable = function(self, add) 
+        return gg.getValues({{address = add + self.forgeable, flags = gg.TYPE_BYTE}})[1].value
+    end,
+    GetTableforforgeable = function(self, add)
+        return {address = add + self.forgeable, flags = gg.TYPE_BYTE, value = 1}
     end
 })
 
@@ -1037,7 +1045,6 @@ UIForge = SetUnityClass({
                 gg.setValues(forgableCount)
             end
         end
-        if not WeaponInfoRow.IsRun then WeaponInfoRow:SetForgeAble() end 
     end
 })
 
@@ -1429,6 +1436,7 @@ functions = {
     end,
     ['UNLOCK ALL WEAPON IN THE BLACKSMITH TABLE'] = function()
         Protect:Call(UIForge.UnlockAllWeapon, UIForge)
+        Protect:Call(WeaponInfo.UnlockAllWeapon, WeaponInfo)
         -- UIForge:UnlockAllWeapon()
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
     end,
