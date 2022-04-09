@@ -789,6 +789,9 @@ RGCharacterInfo = SetUnityClass({
         return RGCharacterInfo.unlock , gg.TYPE_BYTE
     end,
     skin_list = platform and 0x28 or 0x1C,
+    GetTableForUnlockGem = function(self, add, num)
+        return {address = add + self.unlock_gem, flags = gg.TYPE_DWORD, value = num}
+    end,
     SetSkinPrice = function(self,num)
         local skins = {}
         for k,v in ipairs(self:GetInstance()) do
@@ -811,6 +814,9 @@ RGPetInfo = SetUnityClass({
     unlock = platform and 0x10 or 0x8,
     GetUnlock = function()
         return RGPetInfo.unlock , gg.TYPE_BYTE
+    end,
+    GetTableForUnlockGem = function(self, add, num)
+        return {address = add + self.unlock_gem, flags = gg.TYPE_DWORD, value = num}
     end
 })
 
@@ -840,18 +846,18 @@ ItemData = SetUnityClass({
     itemUnlock = platform and 0x28 or 0x18,
     forgeWeapons = platform and 0x30 or 0x1C,
     SetTokens = function(self,value)
-        for k,v in ipairs(self:GetInstance()) do
-            Dictionary:SetAllItemStringInt(gg.getValues({{address = v.address + self.tokenTickets,flags = v.flags}})[1].value,value)
+        for k,v in ipairs(self:GetLocalInstance()) do
+            Dictionary:SetAllItemStringInt(gg.getValues({{address = v.value + self.tokenTickets,flags = v.flags}})[1].value,value)
         end
     end,
     SetMaterials = function(self,value)
-        for k,v in ipairs(self:GetInstance()) do
-            Dictionary:SetAllItemStringInt(gg.getValues({{address = v.address + self.materials,flags = v.flags}})[1].value,value)
+        for k,v in ipairs(self:GetLocalInstance()) do
+            Dictionary:SetAllItemStringInt(gg.getValues({{address = v.value + self.materials,flags = v.flags}})[1].value,value)
         end
     end,
     SetSeeds = function(self,value)
-        for k,v in ipairs(self:GetInstance()) do
-            Dictionary:SetAllItemStringInt(gg.getValues({{address = v.address + self.seeds,flags = v.flags}})[1].value,value)
+        for k,v in ipairs(self:GetLocalInstance()) do
+            Dictionary:SetAllItemStringInt(gg.getValues({{address = v.value + self.seeds,flags = v.flags}})[1].value,value)
         end
     end,
     SetPlant = function(self)
@@ -1342,18 +1348,22 @@ RGSaveManager = SetUnityClass({
     pet_list = platform and 0x20 or 0x10,
     char_list = platform and 0x18 or 0xC,
     SetPricePet = function (self, price)
-        for k,v in ipairs(self:GetInstance()) do
-            for key,value in ipairs(Massiv:GetAllElement(gg.getValues({{address = v.address + self.pet_list, flags = v.flags}})[1].value,"link")) do
-                gg.setValues({{address = value.value + RGPetInfo.unlock_gem, flags = gg.TYPE_DWORD, value = price}})
+        local pets = {}
+        for k,v in ipairs(self:GetLocalInstance()) do
+            for key,value in ipairs(Massiv:GetAllElement(gg.getValues({{address = v.value + self.pet_list, flags = v.flags}})[1].value,"link")) do
+                pets[#pets + 1] = RGPetInfo:From(value.value):GetTableForUnlockGem(price)
             end
         end
+        gg.setValues(pets)
     end,
     SetPriceChar = function(self, price)
-        for k,v in ipairs(self:GetInstance()) do
-            for key,value in ipairs(Massiv:GetAllElement(gg.getValues({{address = v.address + self.char_list, flags = v.flags}})[1].value,"link")) do
-                gg.setValues({{address = value.value + RGCharacterInfo.unlock_gem, flags = gg.TYPE_DWORD, value = price}})
+        local chars = {}
+        for k,v in ipairs(self:GetLocalInstance()) do
+            for key,value in ipairs(Massiv:GetAllElement(gg.getValues({{address = v.value + self.char_list, flags = v.flags}})[1].value,"link")) do
+                chars[#chars + 1] = RGCharacterInfo:From(value.value):GetTableForUnlockGem(price)
             end
         end
+        gg.setValues(chars)
     end
 })
 
