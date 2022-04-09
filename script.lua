@@ -792,6 +792,16 @@ RGCharacterInfo = SetUnityClass({
     GetTableForUnlockGem = function(self, add, num)
         return {address = add + self.unlock_gem, flags = gg.TYPE_DWORD, value = num}
     end,
+    GetTableForSkins = function(self, add, num)
+        local skin = {}
+        for k,v in ipairs(Massiv:From(gg.getValues({{address = add + self.skin_list,flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value):GetAllElement('int')) do
+            if (k ~= 1 and v.value ~= 1) then
+                v.value = num
+                skin[#skin + 1] = v
+            end
+        end
+        return skin
+    end,
     SetSkinPrice = function(self,num)
         local skins = {}
         for k,v in ipairs(self:GetInstance()) do
@@ -1364,7 +1374,17 @@ RGSaveManager = SetUnityClass({
             end
         end
         gg.setValues(chars)
-    end
+    end,
+    SetSkinPrice = function(self, price)
+        local skins = {}
+        for k,v in ipairs(self:GetLocalInstance()) do
+            for key,value in ipairs(Massiv:GetAllElement(gg.getValues({{address = v.value + self.char_list, flags = v.flags}})[1].value,"link")) do
+                local skin = RGCharacterInfo:From(value.value):GetTableForSkins(price)
+                table.move(skin, 1, #skin, #skins + 1, skins)
+            end
+        end
+        gg.setValues(skins)
+    end,
 })
 
 functions = {
@@ -1475,7 +1495,8 @@ functions = {
         if CheckTableIsNil(num) then 
             gg.alert("ВЫ НЕ ВВЕЛИ ЦЕНУ\nYOU DIDN'T ENTER THE PRICE") 
         else
-            Protect:Call(RGCharacterInfo.SetSkinPrice, RGCharacterInfo, num[1])
+            -- Protect:Call(RGCharacterInfo.SetSkinPrice, RGCharacterInfo, num[1])
+            Protect:Call(RGSaveManager.SetSkinPrice, RGSaveManager, num[1])
             -- RGCharacterInfo:SetSkinPrice(num[1])
         end
     end,
