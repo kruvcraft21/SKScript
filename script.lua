@@ -369,6 +369,7 @@ Unity = {
     DefaultOffset1 = platform and 0x10 or 0x8,
     DefaultOffset2 = platform and 0x8 or 0x4,
     DefaultOffset3 = platform and 0xB8 or 0x5C,
+    ParentOffset = platform and 0x58 or 0x2C,
     GetStartLibAddress = function(Address)
         local start = 0
         for k,v in ipairs(libil) do
@@ -429,6 +430,27 @@ Unity = {
         for key,value in ipairs(result) do
             if IsClass(gg.getValues({{address = value.address + self.DefaultOffset2,flags = value.flags}})[1].value) then
                 local tmp = gg.getValues({{address = value.address - self.DefaultOffset1 + self.DefaultOffset3,flags = value.flags}})
+                table.move(gg.getValues({{address = tmp[1].value,flags = tmp[1].flags}}),1,1,#Instances + 1,Instances)
+                gg.toast(lang_main[ClassName] or "")
+            end
+        end
+        gg.clearResults()
+        return Instances
+    end,
+    GetParentLocalInstance = function(self) 
+        local Instances, ClassName = {}, GetNameTableInGlobalSpace(self)
+        gg.clearResults()
+        gg.setRanges(0)
+        gg.setRanges(gg.REGION_C_HEAP | gg.REGION_C_ALLOC | gg.REGION_ANONYMOUS | gg.REGION_C_BSS | gg.REGION_C_DATA | gg.REGION_OTHER)
+        gg.searchNumber("Q 00 '" .. ClassName .. "' 00",gg.TYPE_BYTE,false,gg.SIGN_EQUAL,data[1].start,data[1]['end'])
+        gg.searchNumber("Q '" .. ClassName .. "' ")
+        gg.searchPointer(0)
+        local result = gg.getResults(gg.getResultsCount())
+        gg.clearResults()
+        for key,value in ipairs(result) do
+            if IsClass(gg.getValues({{address = value.address + self.DefaultOffset2,flags = value.flags}})[1].value) then
+                local tmp = gg.getValues({{address = value.address - self.DefaultOffset1 + self.ParentOffset,flags = value.flags}})[1].value
+                tmp = gg.getValues({{address = tmp + self.DefaultOffset3,flags = value.flags}})
                 table.move(gg.getValues({{address = tmp[1].value,flags = tmp[1].flags}}),1,1,#Instances + 1,Instances)
                 gg.toast(lang_main[ClassName] or "")
             end
@@ -1070,11 +1092,11 @@ RGGameProcess = SetUnityClass({
     coin_value = platform and 0x1C or 0x10,
     this_index = platform and 0x18 or 0xC,
     AddCoin = function(self,num)
-        for k,v in ipairs(self:GetInstance()) do
-            local coin_value = gg.getValues({{address = v.address + self.coin_value,flags = gg.TYPE_DWORD}})[1].value
-            local this_index = gg.getValues({{address = v.address + self.this_index,flags = gg.TYPE_DWORD}})[1].value
-            if coin_value >= 0 and coin_value < 1000000000 and this_index >= 0 and this_index < 1000000000 then
-                gg.setValues({{address = v.address + self.coin_value,flags = gg.TYPE_DWORD, value = coin_value + num}})
+        for k,v in ipairs(self:GetParentLocalInstance()) do
+            local coin_value = gg.getValues({{address = v.value + self.coin_value,flags = gg.TYPE_DWORD}})[1].value
+            local this_index = gg.getValues({{address = v.value + self.this_index,flags = gg.TYPE_DWORD}})[1].value
+            if this_index >= 0 and this_index < 1000000000 then
+                gg.setValues({{address = v.value + self.coin_value,flags = gg.TYPE_DWORD, value = coin_value + num}})
             end
         end
     end
