@@ -3,7 +3,9 @@
 ## ОПИСАНИЕ НА РУССКОМ
 Данный скрипт только для игры Soul knight. Работает данный скрипт через программу [GameGuardian](https://gameguardian.net).
 
-<details><summary>### Возможности скрипта</summary>
+### Возможности скрипта
+
+<details><summary>Список</summary>
 
 1. Может убрать почти все ингредиенты для крафта на столе кузнеца (п.с. перед этим надо хотя бы один рецепт посмотреть) (Функция: УБРАТЬ МАТЕРИАЛЫ С КУЗНЕЧНОГО СТОЛА)
 ><details><summary>Пример</summary><p><img src="image/fun1.jpg"></p></details>
@@ -36,13 +38,15 @@
 >[пример использования](https://youtu.be/_5Puq5QMxf4)
 21. Может зарядить волновод (Функция: ЗАРЯДИТЬ ВОЛНОВОД)
 </details>
-
-
+</br>
 
 ## DESCRIPTION IN ENGLISH
 This script is only for Soul knight. This script works via [GameGuardian](https://gameguardian.net).
 
 ### Script Features
+
+<details><summary>List</summary>
+
 
 1. Can remove almost all the ingredients for crafting on the blacksmith's table (ps before that, you need to look at at least one recipe) (Function: REMOVE MATERIALS IN THE BLACKSMITH TABLE)
 ><details><summary>Example</summary><p><img src="image/fun1.jpg"></p></details>
@@ -74,3 +78,4 @@ This script is only for Soul knight. This script works via [GameGuardian](https:
 20. Can reset the number of purchases from the seller (Function: RESET SELLER)
 >[Usage example](https://youtu.be/_5Puq5QMxf4)
 21. Can charge the waveguide (Function: CHARGE THE WAVEGUIDE)
+</details>
