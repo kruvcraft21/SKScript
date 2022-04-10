@@ -3,9 +3,7 @@
 ## ОПИСАНИЕ НА РУССКОМ
 Данный скрипт только для игры Soul knight. Работает данный скрипт через программу [GameGuardian](https://gameguardian.net).
 
-### Возможности скрипта
-
-<details><summary>Список</summary>
+<details><summary>Возможности скрипта</summary>
 
 1. Может убрать почти все ингредиенты для крафта на столе кузнеца (п.с. перед этим надо хотя бы один рецепт посмотреть) (Функция: УБРАТЬ МАТЕРИАЛЫ С КУЗНЕЧНОГО СТОЛА)
 ><details><summary>Пример</summary><p><img src="image/fun1.jpg"></p></details>
@@ -38,14 +36,13 @@
 >[пример использования](https://youtu.be/_5Puq5QMxf4)
 21. Может зарядить волновод (Функция: ЗАРЯДИТЬ ВОЛНОВОД)
 </details>
-</br>
+
 
 ## DESCRIPTION IN ENGLISH
 This script is only for Soul knight. This script works via [GameGuardian](https://gameguardian.net).
 
-### Script Features
 
-<details><summary>List</summary>
+<details><summary>Script Features</summary>
 
 
 1. Can remove almost all the ingredients for crafting on the blacksmith's table (ps before that, you need to look at at least one recipe) (Function: REMOVE MATERIALS IN THE BLACKSMITH TABLE)
