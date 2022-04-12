@@ -750,6 +750,10 @@ function Dictionary:SetNumItem(dictionary,value)
     end
 end
 
+function Dictionary:GetNumItemForTable(dictionary, val)
+    return {address = dictionary + self.num, value = val, flags = gg.TYPE_DWORD}
+end
+
 function Dictionary:GetNumItem(dictionary)
     return gg.getValues({{address = dictionary + self.num,flags = gg.TYPE_DWORD}})[1].value
 end
@@ -1000,16 +1004,18 @@ WeaponsConfig = SetUnityClass({
     Materials = platform and 0x20 or 0x10,
     SizeStruct = platform and 0x38 or 0x1C,
     RemoveMaterials = function(self)
+        local vals = {}
         for k,v in ipairs(self:GetLocalInstance()) do
             local dec = Dictionary:From(v.value)
-            for key,value,length in lpairs(dec:GetAllItemStringToStruct(self.SizeStruct,self.Materials,platform and gg.TYPE_QWORD or gg.TYPE_DWORD)) do
-                Dictionary:SetNumItem(value.value,0)
+            for key,value,length in lpairs(dec:GetAllItemStringToStruct(self.SizeStruct, self.Materials, v.flags)) do
+                vals[#vals + 1] = Dictionary:GetNumItemForTable(value.value, 0)
                 gg.toast(key .. '/' .. length)
             end
             local Prices = dec:GetAllItemStringToStruct(self.SizeStruct,self.Price,gg.TYPE_DWORD)
-            for _,value in ipairs(Prices) do value.value = 2 end
-            gg.setValues(Prices)
+            for _,value in ipairs(Prices) do value.value = 1 end
+            table.move(Prices, 1, #Prices, #vals + 1, vals)
         end
+        gg.setValues(vals)
     end
 })
 
