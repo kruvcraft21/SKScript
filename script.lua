@@ -370,6 +370,26 @@ Unity = {
     DefaultOffset2 = platform and 0x8 or 0x4,
     DefaultOffset3 = platform and 0xB8 or 0x5C,
     ParentOffset = platform and 0x58 or 0x2C,
+    GetClass = function(self, ClassName)
+        gg.clearResults()
+        gg.setRanges(0)
+        gg.setRanges(gg.REGION_C_HEAP | gg.REGION_C_HEAP | gg.REGION_ANONYMOUS | gg.REGION_C_BSS | gg.REGION_C_DATA | gg.REGION_OTHER | gg.REGION_C_ALLOC)
+        gg.searchNumber("Q 00 '" .. ClassName .. "' 00",gg.TYPE_BYTE,false,gg.SIGN_EQUAL,data[1].start,data[1]['end'])
+        gg.searchNumber("Q '" .. ClassName .. "' ")
+        gg.searchPointer(0)
+        local res = gg.getResults(gg.getResultsCount())
+        gg.clearResults()
+        if (#res > 1) then 
+            table.sort(res, function(a,b)
+                if (IsClass(gg.getValues({{address = a.address + Unity.DefaultOffset2,flags = a.flags}})[1].value)) then
+                    return true
+                else
+                    return (not IsClass(gg.getValues({{address = b.address + Unity.DefaultOffset2,flags = b.flags}})[1].value)) and a.address > b.address or false
+                end
+            end)
+        end
+        return res
+    end,
     GetStartLibAddress = function(Address)
         local start = 0
         for k,v in ipairs(libil) do
@@ -393,68 +413,35 @@ Unity = {
     end,
     GetInstance = function(self)
         local Instances, ClassName = {}, GetNameTableInGlobalSpace(self)
-        gg.clearResults()
-        gg.setRanges(0)
-        gg.setRanges(gg.REGION_C_HEAP | gg.REGION_C_HEAP | gg.REGION_ANONYMOUS | gg.REGION_C_BSS | gg.REGION_C_DATA | gg.REGION_OTHER | gg.REGION_C_ALLOC)
-        gg.searchNumber("Q 00 '" .. ClassName .. "' 00",gg.TYPE_BYTE,false,gg.SIGN_EQUAL,data[1].start,data[1]['end'])
-        gg.searchNumber("Q '" .. ClassName .. "' ")
-        gg.searchPointer(0)
-        local result = gg.getResults(gg.getResultsCount())
-        gg.clearResults()
-        for key,value in ipairs(result) do
-            if IsClass(gg.getValues({{address = value.address + self.DefaultOffset2,flags = value.flags}})[1].value) then
-                gg.loadResults({value})
-                gg.searchPointer(self.DefaultOffset1)
-                local r = gg.getResults(gg.getResultsCount())
-                for k,v in ipairs(gg.getValuesRange(r)) do
-                    Instances[#Instances + 1] = v == 'A' and r[k] or nil
-                end
-                Instances = self.FilterObject(Instances)
-                -- print(ClassName .. ' -> ' .. #Instances)
-                gg.toast(lang_main[ClassName] or "")
-            end
+        local MemClass = self:GetClass(ClassName)[1]
+        gg.loadResults({MemClass})
+        gg.searchPointer(self.DefaultOffset1)
+        local r = gg.getResults(gg.getResultsCount())
+        for k,v in ipairs(gg.getValuesRange(r)) do
+            Instances[#Instances + 1] = v == 'A' and r[k] or nil
         end
+        Instances = self.FilterObject(Instances)
+        -- print(ClassName .. ' -> ' .. #Instances)
+        gg.toast(lang_main[ClassName] or "")
         gg.clearResults()
         return Instances
     end,
     GetLocalInstance = function(self) 
         local Instances, ClassName = {}, GetNameTableInGlobalSpace(self)
-        gg.clearResults()
-        gg.setRanges(0)
-        gg.setRanges(gg.REGION_C_HEAP | gg.REGION_C_ALLOC | gg.REGION_ANONYMOUS | gg.REGION_C_BSS | gg.REGION_C_DATA | gg.REGION_OTHER)
-        gg.searchNumber("Q 00 '" .. ClassName .. "' 00",gg.TYPE_BYTE,false,gg.SIGN_EQUAL,data[1].start,data[1]['end'])
-        gg.searchNumber("Q '" .. ClassName .. "' ")
-        gg.searchPointer(0)
-        local result = gg.getResults(gg.getResultsCount())
-        gg.clearResults()
-        for key,value in ipairs(result) do
-            if IsClass(gg.getValues({{address = value.address + self.DefaultOffset2,flags = value.flags}})[1].value) then
-                local tmp = gg.getValues({{address = value.address - self.DefaultOffset1 + self.DefaultOffset3,flags = value.flags}})
-                table.move(gg.getValues({{address = tmp[1].value,flags = tmp[1].flags}}),1,1,#Instances + 1,Instances)
-                gg.toast(lang_main[ClassName] or "")
-            end
-        end
+        local MemClass = self:GetClass(ClassName)[1]
+        local tmp = gg.getValues({{address = MemClass.address - self.DefaultOffset1 + self.DefaultOffset3,flags = MemClass.flags}})
+        table.move(gg.getValues({{address = tmp[1].value,flags = tmp[1].flags}}),1,1,#Instances + 1,Instances)
+        gg.toast(lang_main[ClassName] or "")
         gg.clearResults()
         return Instances
     end,
     GetParentLocalInstance = function(self) 
         local Instances, ClassName = {}, GetNameTableInGlobalSpace(self)
-        gg.clearResults()
-        gg.setRanges(0)
-        gg.setRanges(gg.REGION_C_HEAP | gg.REGION_C_ALLOC | gg.REGION_ANONYMOUS | gg.REGION_C_BSS | gg.REGION_C_DATA | gg.REGION_OTHER)
-        gg.searchNumber("Q 00 '" .. ClassName .. "' 00",gg.TYPE_BYTE,false,gg.SIGN_EQUAL,data[1].start,data[1]['end'])
-        gg.searchNumber("Q '" .. ClassName .. "' ")
-        gg.searchPointer(0)
-        local result = gg.getResults(gg.getResultsCount())
-        gg.clearResults()
-        for key,value in ipairs(result) do
-            if IsClass(gg.getValues({{address = value.address + self.DefaultOffset2,flags = value.flags}})[1].value) then
-                local tmp = gg.getValues({{address = value.address - self.DefaultOffset1 + self.ParentOffset,flags = value.flags}})[1].value
-                tmp = gg.getValues({{address = tmp + self.DefaultOffset3,flags = value.flags}})
-                table.move(gg.getValues({{address = tmp[1].value,flags = tmp[1].flags}}),1,1,#Instances + 1,Instances)
-                gg.toast(lang_main[ClassName] or "")
-            end
-        end
+        local MemClass = self:GetClass(ClassName)[1]
+        local tmp = gg.getValues({{address = MemClass.address - self.DefaultOffset1 + self.ParentOffset,flags = MemClass.flags}})[1].value
+        tmp = gg.getValues({{address = tmp + self.DefaultOffset3,flags = MemClass.flags}})
+        table.move(gg.getValues({{address = tmp[1].value,flags = tmp[1].flags}}),1,1,#Instances + 1,Instances)
+        gg.toast(lang_main[ClassName] or "")
         gg.clearResults()
         return Instances
     end,
