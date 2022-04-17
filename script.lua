@@ -133,7 +133,7 @@ Protect = {
         print(err)
     end,
     Call = function(self, fun, ...) 
-        xpcall(fun, self.ErrorHandler, ...)
+        return ({xpcall(fun, self.ErrorHandler, ...)})[2]
     end
 }
 
@@ -235,41 +235,37 @@ function setupValues(gf,gm,typeset)
     gg.setValues({{address = gf,flags = typeset and typeset or gg.TYPE_DWORD,value = gm:gsub('.', function (c) return string.format('%02X', string.byte(c)) end)..'r'}})
 end
 
-function il2cppname(namefucntion)
-    fandress = {}
-    namefucntion = "00 " .. namefucntion:gsub('.', function (c) return string.format('%02X', string.byte(c)) .. " " end) .. "00"
+function Il2CppName(NameFucntion)
+    local FinalMethods, name = {}, "00 " .. NameFucntion:gsub('.', function (c) return string.format('%02X', string.byte(c)) .. " " end) .. "00"
     gg.clearResults()
     gg.setRanges(gg.REGION_C_HEAP | gg.REGION_C_ALLOC | gg.REGION_ANONYMOUS | gg.REGION_C_BSS | gg.REGION_C_DATA | gg.REGION_OTHER)
-    gg.searchNumber('h ' .. namefucntion,gg.TYPE_WORD,false,gg.SIGN_EQUAL,data[1].start,data[1]['end'])
-    if gg.getResultsCount() == 0 then return {},'the function was not found' end
-    gg.searchNumber('h ' .. string.sub(namefucntion,4,5)) 
-    local r = gg.getResults(10000)
+    gg.searchNumber('h ' .. name, gg.TYPE_BYTE, false, gg.SIGN_EQUAL, data[1].start, data[#data]['end'])
+    if gg.getResultsCount() == 0 then error('the "' .. NameFucntion .. '" function was not found') end
+    gg.searchNumber('h ' .. string.sub(name,4,5)) 
+    local r = gg.getResults(gg.getResultsCount())
     gg.clearResults()
-    for j = 1,#r do
-        local adres = {r[j]}
+    for key, value in ipairs(r) do
         if gg.BUILD < 16126 then 
-            gg.searchNumber(string.format("%8.8X", adres[1].address) .. 'h',foril2cpp.type())
+            gg.searchNumber(string.format("%8.8X", foril2cpp.value(value.address)) .. 'h',foril2cpp.type())
         else 
-            gg.loadResults(adres)
+            gg.loadResults({value})
             gg.searchPointer(0)
         end
-        adres = gg.getResults(1000)
-        if gg.getResultsCount() == 0 and fandress[1] == nil and j == #r then return {},'the function pointer was not found' end
+        local MethodsInfo = gg.getResults(gg.getResultsCount())
         gg.clearResults()
-        for h = 1,#adres do
-            adress = {adres[h]}
-            adress[1].address = adress[1].address - foril2cpp.num(1)
-            adress = gg.getValues(adress)
-            finaladdres = foril2cpp.value(adress[1].value)
-            if (finaladdres > libil[1].start and finaladdres < libil[#libil]['end']) then 
-                fandress[#fandress + 1] = {
-                    addressmethod = finaladdres,
-                    address = adress[1].address
+        for k, v in ipairs(MethodsInfo) do
+            v.address = v.address - foril2cpp.num(1)
+            local FinalAddress = foril2cpp.value(gg.getValues({v})[1].value)
+            if (FinalAddress > libil[1].start and FinalAddress < libil[#libil]['end']) then 
+                FinalMethods[#FinalMethods + 1] = {
+                    AddressMethod = FinalAddress,
+                    Address = v.address
                 }
             end
         end
     end
-    return fandress,'true'
+    if (#FinalMethods == 0) then error('the "' .. NameFucntion .. '" function pointer was not found') end
+    return FinalMethods
 end
 
 function addresspath(StartAddress, ...)
@@ -380,7 +376,7 @@ Unity = {
         local res = gg.getResults(gg.getResultsCount())
         gg.clearResults()
         if (#res > 1) then 
-            table.sort(res, function(a,b)
+            table.sort(res, function(a, b)
                 if (IsClass(gg.getValues({{address = a.address + Unity.DefaultOffset2,flags = a.flags}})[1].value)) then
                     return true
                 else
@@ -388,7 +384,7 @@ Unity = {
                 end
             end)
         end
-        return res
+        return res[1]
     end,
     GetStartLibAddress = function(Address)
         local start = 0
@@ -413,7 +409,7 @@ Unity = {
     end,
     GetInstance = function(self)
         local Instances, ClassName = {}, GetNameTableInGlobalSpace(self)
-        local MemClass = self:GetClass(ClassName)[1]
+        local MemClass = self:GetClass(ClassName)
         gg.loadResults({MemClass})
         gg.searchPointer(self.DefaultOffset1)
         local r = gg.getResults(gg.getResultsCount())
@@ -428,7 +424,7 @@ Unity = {
     end,
     GetLocalInstance = function(self) 
         local Instances, ClassName = {}, GetNameTableInGlobalSpace(self)
-        local MemClass = self:GetClass(ClassName)[1]
+        local MemClass = self:GetClass(ClassName)
         local tmp = gg.getValues({{address = MemClass.address - self.DefaultOffset1 + self.DefaultOffset3,flags = MemClass.flags}})
         table.move(gg.getValues({{address = tmp[1].value,flags = tmp[1].flags}}),1,1,#Instances + 1,Instances)
         gg.toast(lang_main[ClassName] or "")
@@ -437,7 +433,7 @@ Unity = {
     end,
     GetParentLocalInstance = function(self) 
         local Instances, ClassName = {}, GetNameTableInGlobalSpace(self)
-        local MemClass = self:GetClass(ClassName)[1]
+        local MemClass = self:GetClass(ClassName)
         local tmp = gg.getValues({{address = MemClass.address - self.DefaultOffset1 + self.ParentOffset,flags = MemClass.flags}})[1].value
         tmp = gg.getValues({{address = tmp + self.DefaultOffset3,flags = MemClass.flags}})
         table.move(gg.getValues({{address = tmp[1].value,flags = tmp[1].flags}}),1,1,#Instances + 1,Instances)
@@ -445,34 +441,46 @@ Unity = {
         gg.clearResults()
         return Instances
     end,
+    GetClassName = function(Address)
+        local bytes, char = {}, {address = foril2cpp.value(Address), flags = gg.TYPE_BYTE}
+        while gg.getValues({char})[1].value > 0 do
+            bytes[#bytes + 1] = {address = char.address, flags = char.flags}
+            char.address = char.address + 0x1
+        end
+        return tostring(setmetatable(gg.getValues(bytes), {
+            __tostring = function(self)
+                for k,v in ipairs(self) do
+                    self[k] = string.char(v.value) 
+                end
+                return table.concat(self)
+            end
+        }))
+    end,
     GetIl2cppFunc = function(...)
-        local args = {...}
+        local args, RetIl2CppFuncs = {...}, {}
         if args[1] == nil or args[1] == "" or args[1] == " " then return {},"you didn't enter the function" end 
-        local retaddress = {}
         for keyname,namefucntion in ipairs(args) do
-            local finaladdres,errorcode = il2cppname(namefucntion)
-            if #finaladdres == 0 then return finaladdres,errorcode end
-            for k,v in ipairs(finaladdres) do
-                local adrescheck = gg.getValues({{address = v.address + foril2cpp.num(4),flags = foril2cpp.type()}})
-                local aclass = adrescheck[1].value
-                adrescheck = gg.getValues({{address = adrescheck[1].value + foril2cpp.num(1),flags = foril2cpp.type()}})
-                   adrescheck = gg.getValues({{address = adrescheck[1].value,flags = gg.TYPE_BYTE}})
-                local printclass = ""
-                while adrescheck[1].value ~= 0 do
-                    if adrescheck[1].value then printclass = printclass .. string.char(adrescheck[1].value & 0xff) end
-                    adrescheck = gg.getValues({{address = adrescheck[1].address + 0x1,flags = gg.TYPE_BYTE}})
-                end 
-                retaddress[#retaddress + 1] = {
-                    NameFucntion = namefucntion,
-                    Offset = string.format("%8.8X",v.addressmethod - Unity.GetStartLibAddress(v.addressmethod)),
-                    AddressInMemory = string.format("%8.8X",v.addressmethod),
-                    AddressOffset = v.address,
-                    Class = printclass,
-                    ClassAddress = string.format('%X', aclass)
-                   }
+            local finaladdres = Il2CppName(namefucntion)
+            for k,v in pairs(finaladdres) do
+                if (k ~= 'Error') then
+                    local AddressClass = foril2cpp.value(gg.getValues({{address = v.Address + foril2cpp.num(4),flags = foril2cpp.type()}})[1].value)
+                    RetIl2CppFuncs[#RetIl2CppFuncs + 1] = {
+                        NameFucntion = namefucntion,
+                        Offset = string.format("%X",v.AddressMethod - Unity.GetStartLibAddress(v.AddressMethod)),
+                        AddressInMemory = string.format("%X",v.AddressMethod),
+                        AddressOffset = v.Address,
+                        Class = Unity.GetClassName(gg.getValues({{address = AddressClass + foril2cpp.num(1),flags = foril2cpp.type()}})[1].value),
+                        ClassAddress = string.format('%X', AddressClass)
+                    }
+                else
+                    RetIl2CppFuncs[#RetIl2CppFuncs + 1] = {
+                        NameFucntion = namefucntion,
+                        Error = v
+                    }
+                end
             end
         end
-        return retaddress,'true'
+        return RetIl2CppFuncs,'true'
     end,
     From = function (self, a)
         return setmetatable({address = a, mClass = self}, {
@@ -1150,7 +1158,7 @@ VacantWallListener = SetUnityClass({
     IsRun = false,
     RemoveVacWall = function (self)
         for k,v in ipairs(self.GetIl2cppFunc('OnTriggerEnter2D')) do
-            if v.Class == GetNameTableInGlobalSpace(self) then
+            if (not v.Error) and v.Class == GetNameTableInGlobalSpace(self) then
                 addresspath(tonumber(v.AddressInMemory,16),platform and "\xc0\x03\x5f\xd6" or "\x1e\xff\x2f\xe1")
             end
         end
