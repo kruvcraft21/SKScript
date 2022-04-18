@@ -998,6 +998,7 @@ WeaponsConfig = SetUnityClass({
     Key = platform and 0x18 or 0xC,
     Materials = platform and 0x20 or 0x10,
     SizeStruct = platform and 0x38 or 0x1C,
+    DisableUnlockByPick = platform and 0x8 and 0x4,
     RemoveMaterials = function(self)
         local vals = {}
         for k,v in ipairs(self:GetLocalInstance()) do
@@ -1011,6 +1012,15 @@ WeaponsConfig = SetUnityClass({
             table.move(Prices, 1, #Prices, #vals + 1, vals)
         end
         gg.setValues(vals)
+    end,
+    DisableLock = function(self)
+        local weapons = {}
+        for k,v in ipairs(self:GetLocalInstance()) do
+            local dec = Dictionary:From(v.value)
+            local DisableUnlockByPick = dec:GetAllItemStringToStruct(self.SizeStruct, self.DisableUnlockByPick, gg.TYPE_DWORD)
+            for _, value in ipairs(DisableUnlockByPick) do value.value = 1 end
+            table.move(DisableUnlockByPick, 1, #DisableUnlockByPick, #weapons + 1, weapons)
+        end
     end
 })
 
@@ -1492,6 +1502,7 @@ functions = {
     ['UNLOCK ALL WEAPON IN THE BLACKSMITH TABLE'] = function()
         Protect:Call(UIForge.UnlockAllWeapon, UIForge)
         Protect:Call(WeaponInfo.UnlockAllWeapon, WeaponInfo)
+        Protect:Call(WeaponsConfig.DisableLock, WeaponsConfig)
         -- UIForge:UnlockAllWeapon()
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
     end,
