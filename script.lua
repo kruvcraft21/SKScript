@@ -1502,7 +1502,7 @@ functions = {
     ['UNLOCK ALL WEAPON IN THE BLACKSMITH TABLE'] = function()
         Protect:Call(UIForge.UnlockAllWeapon, UIForge)
         Protect:Call(WeaponInfo.UnlockAllWeapon, WeaponInfo)
-        Protect:Call(WeaponsConfig.DisableLock, WeaponsConfig)
+        -- Protect:Call(WeaponsConfig.DisableLock, WeaponsConfig)
         -- UIForge:UnlockAllWeapon()
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
     end,
