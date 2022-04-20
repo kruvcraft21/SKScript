@@ -7,6 +7,7 @@ lang = {
         "РАЗБЛОКИРОВАТЬ ВСЕ ОРУЖИЕ НА СТОЛЕ КУЗНЕЦА",
         "ИЗМЕНИТЬ СОЗДАННЫЕ ПРЕДМЕТЫ НА СТОЛЕ КУЗНЕЦА",
         "УСТАНОВИТЬ ЦЕНУ ТОВАРОВ У ПРОДАВЦА",
+        "ДОБАВИТЬ ВСЕ БАФЫ",
         "РАЗБЛОКИРОВАТЬ ВСЕ САДОВЫЕ УЧАСТКИ",
         "ВЫРАСТИТЬ ВСЕ РАСТЕНИЯ",
         "РАЗБЛОКИРОВАТЬ МОТОЦИКЛ",
@@ -32,6 +33,7 @@ lang = {
         'UNLOCK ALL WEAPON IN THE BLACKSMITH TABLE',
         "CHANGE THE CREATED ITEMS ON THE BLACKSMITH'S TABLE",
         'SET THE PRICE OF ITEMS FROM THE MERCHANT',
+        'ADD ALL BUFFS',
         "UNLOCK ALL GARDEN PLOTS",
         'GROW ALL THE SEEDS',
         "UNLOCK MOTORCYCLE",
@@ -78,7 +80,8 @@ langClass = {
         Emtry = 'Пусто',
         ErrorLib = 'Game Guardian не нашёл нужную библиотеку. Скрипт запустится, но будет работать частично некорректно',
         ErrorAlert = 'При выполнении функции произошла ошибка',
-        SkinMaterialRelation = 'Чертежи скинов получены'
+        SkinMaterialRelation = 'Чертежи скинов получены',
+        BattleData = 'Боевые данные найдены'
     },
     ['en_US'] = {
         SkillInfo = "Skills found",
@@ -105,7 +108,8 @@ langClass = {
         Emtry = 'Emtry',
         ErrorLib = "Game Guardian didn't find the right library. The script will run, but it will work partially incorrectly",
         ErrorAlert = 'An error occurred while executing the function',
-        SkinMaterialRelation = 'Blueprint of skins have been received'
+        SkinMaterialRelation = 'Blueprint of skins have been received',
+        BattleData = 'Battle data found'
     },
 }
 
@@ -227,6 +231,7 @@ if #libil == 0 then
             if (gg.getResultsCount() > 0) then
                 libil[#libil + 1] = v
             end
+            gg.clearResults()
         end
     end
 end
@@ -375,14 +380,11 @@ Unity = {
         gg.searchPointer(0)
         local res = gg.getResults(gg.getResultsCount())
         gg.clearResults()
-        if (#res > 1) then 
-            table.sort(res, function(a, b)
-                if (IsClass(gg.getValues({{address = a.address + Unity.DefaultOffset2,flags = a.flags}})[1].value)) then
-                    return true
-                else
-                    return (not IsClass(gg.getValues({{address = b.address + Unity.DefaultOffset2,flags = b.flags}})[1].value)) and a.address > b.address or false
-                end
-            end)
+        if (#res > 1) then
+            for k,v in ipairs(res) do
+                local assembly = gg.getValues({{address = v.address - Unity.DefaultOffset1,flags = v.flags}})[1].value
+                if (IsClass(gg.getValues({{address = assembly ,flags = v.flags}})[1].value)) then res[1] = v end
+            end
         end
         return res[1]
     end,
@@ -555,6 +557,29 @@ end
 function List:SetLink(list,link)
     gg.setValues({{address = list + self.link,flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD,value = link}})
 end
+
+List['int'] = SetSubClass({
+    ElementToTable = function(tabl)
+        local resTab = {}
+        for k,v in ipairs(tabl) do
+            resTab[#resTab + 1] = type(v) ~= 'number' and v.value or v
+        end
+        return resTab
+    end,
+    EditList = function(self, list, newTable, saveOld)
+        local MainTable, MainHead, num = {}, 0, List:GetNumItem(list)
+        if (not (num < 0)) and num < 200 then
+            local link = List:GetLink(list)
+            MainHead = gg.getValues({{address = link, flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value
+            if (saveOld) then table.move(self.ElementToTable(Massiv:GetAllElement(link, 'int')), 1, num, #MainTable + 1, MainTable) end
+            table.move(newTable, 1, #newTable, #MainTable + 1, MainTable)
+            pageMemory = pageMemory == 0 and gg.allocatePage(gg.PROT_READ | gg.PROT_WRITE, list) or pageMemory
+            self:SetNumItem(list, #MainTable)
+            self:SetLink(list, pageMemory)
+            pageMemory = pageMemory + Massiv:CreateMassiv(pageMemory, MainHead, 'int', MainTable)
+        end
+    end
+}, List)
 
 List['string'] = SetSubClass({    
     subType = 'char',
@@ -1420,6 +1445,27 @@ RGSaveManager = SetUnityClass({
     end,
 })
 
+emBuff = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,1000,1001,1003,1004,1005,1006,1007,1008,1009}
+
+BattleData = SetUnityClass({
+    buffs = platform and 0xA0 or 0x74,
+    GetAllBuffs = function(self)
+        for k, v in ipairs(self:GetLocalInstance()) do
+            local lists = gg.getValues({
+                {
+                    address = v.value + self.buffs,
+                    flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD
+                }
+            })
+            for key, val in ipairs(lists) do
+                if (val.value ~= 0) then 
+                    List['int']:EditList(val.value, emBuff, true) 
+                end
+            end
+        end
+    end
+})
+
 functions = {
     ['EXIT'] = function()
         if not pcall(dropboxfile,"MainMenu.lua") then os.exit() end
@@ -1429,7 +1475,6 @@ functions = {
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
     end,
     ["REMOVE MATERIALS FROM THE DESIGNER'S TABLE"] = function ()
-        -- ItemBluePrint:HackBluePrint()
         Protect:Call(ItemBluePrint.HackBluePrint, ItemBluePrint)
         Protect:Call(SkinMaterialRelation.HackSkinMaterial, SkinMaterialRelation)
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
@@ -1440,7 +1485,6 @@ functions = {
             gg.alert("ВЫ НЕ ВВЕЛИ КОЛИЧЕСТВО\nYOU DIDN'T ENTER THE QUANTITY") 
         else
             Protect:Call(ItemData.SetSeeds, ItemData, num[1])
-            -- ItemData:SetSeeds(num[1])
         end
     end,
     ['SET MATERIALS COUNT'] = function ()
@@ -1449,7 +1493,6 @@ functions = {
             gg.alert("ВЫ НЕ ВВЕЛИ КОЛИЧЕСТВО\nYOU DIDN'T ENTER THE QUANTITY") 
         else
             Protect:Call(ItemData.SetMaterials, ItemData, num[1])
-            -- ItemData:SetMaterials(num[1])
         end
     end,
     ['SET TOKENS COUNT'] = function ()
@@ -1458,7 +1501,6 @@ functions = {
             gg.alert("ВЫ НЕ ВВЕЛИ КОЛИЧЕСТВО\nYOU DIDN'T ENTER THE QUANTITY") 
         else
             Protect:Call(ItemData.SetTokens, ItemData, num[1])
-            -- ItemData:SetTokens(num[1])
         end
     end,
     ['SET PET PRICE'] = function ()
@@ -1467,8 +1509,6 @@ functions = {
             gg.alert("ВЫ НЕ ВВЕЛИ ЦЕНУ\nYOU DIDN'T ENTER THE PRICE") 
         else
             Protect:Call(RGSaveManager.SetPricePet, RGSaveManager, num[1])
-            --RGPetInfo:SetPrice(num[1])
-            -- RGSaveManager:SetPricePet(num[1])
         end
     end,
     ['SET HERO PRICE'] = function ()
@@ -1477,8 +1517,6 @@ functions = {
             gg.alert("ВЫ НЕ ВВЕЛИ ЦЕНУ\nYOU DIDN'T ENTER THE PRICE") 
         else
             Protect:Call(RGSaveManager.SetPriceChar, RGSaveManager, num[1])
-            --RGCharacterInfo:SetPrice(num[1])
-            -- RGSaveManager:SetPriceChar(num[1])
         end
     end,
     ['SET SKILL PRICE'] = function ()
@@ -1487,7 +1525,6 @@ functions = {
             gg.alert("ВЫ НЕ ВВЕЛИ ЦЕНУ\nYOU DIDN'T ENTER THE PRICE") 
         else
             Protect:Call(SkillInfo.SetPrice, SkillInfo, num[1])
-            -- SkillInfo:SetPrice(num[1])
         end
     end,
     ["SET THE NUMBER OF WEAPONS RECEIVED"] = function ()
@@ -1496,14 +1533,12 @@ functions = {
             gg.alert("ВЫ НЕ ВВЕЛИ КОЛИЧЕСТВО\nYOU DIDN'T ENTER THE QUANTITY") 
         else
             Protect:Call(StatisticData.SetTimesWeapon, StatisticData, num[1])
-            -- StatisticData:SetTimesWeapon(num[1])
         end
     end,
     ['UNLOCK ALL WEAPON IN THE BLACKSMITH TABLE'] = function()
         Protect:Call(UIForge.UnlockAllWeapon, UIForge)
         Protect:Call(WeaponInfo.UnlockAllWeapon, WeaponInfo)
         -- Protect:Call(WeaponsConfig.DisableLock, WeaponsConfig)
-        -- UIForge:UnlockAllWeapon()
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
     end,
     ['ADD COINS'] = function()
@@ -1512,7 +1547,6 @@ functions = {
             gg.alert("ВЫ НЕ ВВЕЛИ КОЛИЧЕСТВО\nYOU DIDN'T ENTER THE QUANTITY") 
         else
             Protect:Call(RGGameProcess.AddCoin, RGGameProcess, num[1])
-            -- RGGameProcess:AddCoin(num[1])
         end
     end,
     ['SET THE PRICE OF ITEMS FROM THE MERCHANT'] = function()
@@ -1521,7 +1555,6 @@ functions = {
             gg.alert("ВЫ НЕ ВВЕЛИ ЦЕНУ\nYOU DIDN'T ENTER THE PRICE") 
         else
             Protect:Call(ItemSellPlaceGem.SetPrice, ItemSellPlaceGem, num[1])
-            -- ItemSellPlaceGem:SetPrice(num[1])
         end
     end,
     ['SET SKIN PRICE'] = function()
@@ -1529,14 +1562,11 @@ functions = {
         if CheckTableIsNil(num) then 
             gg.alert("ВЫ НЕ ВВЕЛИ ЦЕНУ\nYOU DIDN'T ENTER THE PRICE") 
         else
-            -- Protect:Call(RGCharacterInfo.SetSkinPrice, RGCharacterInfo, num[1])
             Protect:Call(RGSaveManager.SetSkinPrice, RGSaveManager, num[1])
-            -- RGCharacterInfo:SetSkinPrice(num[1])
         end
     end,
     ['GROW ALL THE SEEDS'] = function()
         Protect:Call(PlantInfo.GrowAllSeeds, PlantInfo)
-        -- PlantInfo:GrowAllSeeds()
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
     end,
     MaxHp = 0,
@@ -1586,31 +1616,25 @@ functions = {
     end,
     ['HUGE DAMAGE'] = function()
         Protect:Call(RGWeapon.EditFrontWeapon, RGWeapon)
-        -- RGWeapon:EditFrontWeapon()
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
     end,
     ['NO WALLS'] = function ()
         Protect:Call(Rigidbody2D.NoClip, Rigidbody2D)
-        -- Rigidbody2D:NoClip()
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
     end,
     ["UNLOCK ALL GARDEN PLOTS"] = function()
         Protect:Call(ItemData.SetPlant, ItemData)
-        -- ItemData:SetPlant()
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
     end,
     ["CHANGE THE CREATED ITEMS ON THE BLACKSMITH'S TABLE"] = function()
         Protect:Call(ItemData.SetItemForge, ItemData)
-        -- ItemData:SetItemForge()
     end,
     ["UNLOCK MOTORCYCLE"] = function()
         Protect:Call(ItemData.AddMotor, ItemData)
-        -- ItemData:AddMotor()
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
     end,
     ["REMOVE THE NUMBER OF BOSS RUSH ATTEMPTS"] = function()
         Protect:Call(ItemData.EditTimesBossRush, ItemData)
-        -- ItemData:EditTimesBossRush()
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
     end,
     ['RESET SELLER'] = function()
@@ -1620,10 +1644,11 @@ functions = {
     ['CHARGE THE WAVEGUIDE'] = function()
         Protect:Call(StatisticData.SetPower, StatisticData) 
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")   
-    end
+    end,
+    ['ADD ALL BUFFS'] = function()
+        Protect:Call(BattleData.GetAllBuffs, BattleData)
+    end,
 }
-
--- ItemBluePrint:EditSelectedBluePrint()
 
 while true do
     if gg.isVisible() or x ~= nil then

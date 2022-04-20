@@ -35,6 +35,7 @@
 20. Может сбросить количество покупок у продавца (Функция: УБРАТЬ КОЛИЧЕСТВО ПОКУПОК У ПРОДАВЦА)
 >[пример использования](https://youtu.be/_5Puq5QMxf4)
 21. Может зарядить волновод (Функция: ЗАРЯДИТЬ ВОЛНОВОД)
+22. Может добавить все возможные бафы (Функция: ДОБАВИТЬ ВСЕ БАФЫ)
 </details>
 
 
@@ -75,4 +76,5 @@ This script is only for Soul knight. This script works via [GameGuardian](https:
 20. Can reset the number of purchases from the seller (Function: RESET SELLER)
 >[Usage example](https://youtu.be/_5Puq5QMxf4)
 21. Can charge the waveguide (Function: CHARGE THE WAVEGUIDE)
+22. Can add all possible buffs (Function: ADD ALL BUFFS)
 </details>
