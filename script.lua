@@ -358,6 +358,12 @@ function lpairs(...)
     ), ..., nil
 end
 
+function GetAddressMemory(startAddress, add)
+    local localPageMemory = ((pageMemory == 0) or (((pageMemory & 0xFFF) + add) > 3500)) and gg.allocatePage(gg.PROT_READ | gg.PROT_WRITE, startAddress) or pageMemory
+    pageMemory = localPageMemory + add
+    return localPageMemory
+end
+
 local function fixvalue32(value)
     return platform and value or value & 0xFFFFFFFF
 end
@@ -573,10 +579,8 @@ List['int'] = SetSubClass({
             MainHead = gg.getValues({{address = link, flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value
             if (saveOld) then table.move(self.ElementToTable(Massiv:GetAllElement(link, 'int')), 1, num, #MainTable + 1, MainTable) end
             table.move(newTable, 1, #newTable, #MainTable + 1, MainTable)
-            pageMemory = pageMemory == 0 and gg.allocatePage(gg.PROT_READ | gg.PROT_WRITE, list) or pageMemory
             self:SetNumItem(list, #MainTable)
-            self:SetLink(list, pageMemory)
-            pageMemory = pageMemory + Massiv:CreateMassiv(pageMemory, MainHead, 'int', MainTable)
+            self:SetLink(list, Massiv:CreateMassiv(list, MainHead, 'int', MainTable))
         end
     end
 }, List)
@@ -597,16 +601,13 @@ List['string'] = SetSubClass({
             end
         end
         if SubHead ~= 0 then
-            pageMemory = pageMemory == 0 and gg.allocatePage(gg.PROT_READ | gg.PROT_WRITE, list) or pageMemory
             MainTable = saveOld and EditTableLink(MainTable) or {}
             for i = 1, #newTable do
                 local addTable = StringToTable(newTable[i])
-                MainTable[#MainTable + 1] = pageMemory
-                pageMemory = pageMemory + Massiv:CreateMassiv(pageMemory, SubHead, self.subType, addTable)
+                MainTable[#MainTable + 1] = Massiv:CreateMassiv(list, SubHead, self.subType, addTable)
             end
             self:SetNumItem(list,#MainTable)
-            self:SetLink(list,pageMemory)
-            pageMemory = pageMemory + Massiv:CreateMassiv(pageMemory,MainHead,self.mainType,MainTable)
+            self:SetLink(list,Massiv:CreateMassiv(list,MainHead,self.mainType,MainTable))
         end
     end,
     EditIndexList = function(self, list, index, str)
@@ -620,10 +621,8 @@ List['string'] = SetSubClass({
             end
         end
         if SubHead ~= 0 then
-            pageMemory = pageMemory == 0 and gg.allocatePage(gg.PROT_READ | gg.PROT_WRITE, list) or pageMemory
             str = StringToTable(str)
-            Massiv:SetElement(link, pageMemory, self.mainType, index)
-            pageMemory = pageMemory + Massiv:CreateMassiv(pageMemory, SubHead, self.subType, str)
+            Massiv:SetElement(link, Massiv:CreateMassiv(list, SubHead, self.subType, str), self.mainType, index)
         end
     end,
     Filter = function(t)
@@ -668,28 +667,30 @@ Massiv = SetEnumClass({
 
 -- Lua Table to C# Massiv
 function Massiv:CreateMassiv(address,head,T,Mtable)
-    local SizeMassiv = #Mtable
+    local SizeMassiv = #Mtable 
+    local SizeInMemory = self[T].firstStep + (self[T].step * (SizeMassiv % 2 > 0 and SizeMassiv + 1 or SizeMassiv)) + 0x8
+    local addressInMemory = GetAddressMemory(address, SizeInMemory)
     local SetMass = {
         {
-            address = address,
+            address = addressInMemory,
             value = head,
             flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD,
         },
         {
-            address = address + self[T].firstStep,
+            address = addressInMemory + self[T].firstStep,
             flags = gg.TYPE_DWORD,
             value = SizeMassiv
         }
     }
     for i = 1, SizeMassiv do
         SetMass[#SetMass + 1] = {
-            address = address + self[T].firstStep + self[T].skip + (self[T].step * i),
+            address = addressInMemory + self[T].firstStep + self[T].skip + (self[T].step * i),
             flags = self[T].size,
             value = Mtable[i]
         }
     end
     gg.setValues(SetMass)
-    return self[T].firstStep + (self[T].step * (SizeMassiv % 2 > 0 and SizeMassiv + 1 or SizeMassiv)) + 0x8
+    return addressInMemory
 end
 
 function Massiv:SetAllElement(link, value, T)
@@ -1451,17 +1452,8 @@ BattleData = SetUnityClass({
     buffs = platform and 0xA0 or 0x74,
     GetAllBuffs = function(self)
         for k, v in ipairs(self:GetLocalInstance()) do
-            local lists = gg.getValues({
-                {
-                    address = v.value + self.buffs,
-                    flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD
-                }
-            })
-            for key, val in ipairs(lists) do
-                if (val.value ~= 0) then 
-                    List['int']:EditList(val.value, emBuff, true) 
-                end
-            end
+            local list = gg.getValues({{address = v.value + self.buffs, flags = v.flags}})[1].value
+            if (list ~= 0) then List['int']:EditList(list, emBuff, true) end
         end
     end
 })
