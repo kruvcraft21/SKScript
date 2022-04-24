@@ -5,9 +5,10 @@ lang = {
         "УБРАТЬ МАТЕРИАЛЫ С КУЗНЕЧНОГО СТОЛА",
         "УБРАТЬ МАТЕРИАЛЫ СО СТОЛА КОНСТРУКТОРА",
         "РАЗБЛОКИРОВАТЬ ВСЕ ОРУЖИЕ НА СТОЛЕ КУЗНЕЦА",
+        "ДОБАВИТЬ ВСЕ БАФЫ",
+        -- 'НЕТ ПЕРЕЗАРЯДКИ НАВЫКОВ',
         "ИЗМЕНИТЬ СОЗДАННЫЕ ПРЕДМЕТЫ НА СТОЛЕ КУЗНЕЦА",
         "УСТАНОВИТЬ ЦЕНУ ТОВАРОВ У ПРОДАВЦА",
-        "ДОБАВИТЬ ВСЕ БАФЫ",
         "РАЗБЛОКИРОВАТЬ ВСЕ САДОВЫЕ УЧАСТКИ",
         "ВЫРАСТИТЬ ВСЕ РАСТЕНИЯ",
         "РАЗБЛОКИРОВАТЬ МОТОЦИКЛ",
@@ -31,9 +32,10 @@ lang = {
         'REMOVE MATERIALS IN THE BLACKSMITH TABLE',
         "REMOVE MATERIALS FROM THE DESIGNER'S TABLE",
         'UNLOCK ALL WEAPON IN THE BLACKSMITH TABLE',
+        'ADD ALL BUFFS',
+        -- 'NO SKILL CD',
         "CHANGE THE CREATED ITEMS ON THE BLACKSMITH'S TABLE",
         'SET THE PRICE OF ITEMS FROM THE MERCHANT',
-        'ADD ALL BUFFS',
         "UNLOCK ALL GARDEN PLOTS",
         'GROW ALL THE SEEDS',
         "UNLOCK MOTORCYCLE",
@@ -368,6 +370,12 @@ local function fixvalue32(value)
     return platform and value or value & 0xFFFFFFFF
 end
 
+function MyLenTable(t)
+    local ret = 0
+    for k,v in pairs(t) do ret = ret + 1 end
+    return ret
+end
+
 function IsClass(address)
     return (fixvalue32(address) > fixvalue32(data[1].start) and fixvalue32(address) < fixvalue32(data[1]['end']))
 end
@@ -377,6 +385,10 @@ Unity = {
     DefaultOffset2 = platform and 0x8 or 0x4,
     DefaultOffset3 = platform and 0xB8 or 0x5C,
     ParentOffset = platform and 0x58 or 0x2C,
+    NumFields = platform and 0x120 or 0xA8,
+    FieldsLink = platform and 0x80 or 0x40,
+    FieldsStep = platform and 0x20 or 0x14,
+    FieldsOffset = platform and 0x18 or 0xC,  
     GetClass = function(self, ClassName)
         gg.clearResults()
         gg.setRanges(0)
@@ -392,6 +404,7 @@ Unity = {
                 if (IsClass(gg.getValues({{address = assembly ,flags = v.flags}})[1].value)) then res[1] = v end
             end
         end
+        if not self.ClassLoad then self:SetFields(res[1].address - Unity.DefaultOffset1) end
         return res[1]
     end,
     GetStartLibAddress = function(Address)
@@ -449,7 +462,7 @@ Unity = {
         gg.clearResults()
         return Instances
     end,
-    GetClassName = function(Address)
+    Utf8ToString = function(Address)
         local bytes, char = {}, {address = foril2cpp.value(Address), flags = gg.TYPE_BYTE}
         while gg.getValues({char})[1].value > 0 do
             bytes[#bytes + 1] = {address = char.address, flags = char.flags}
@@ -477,7 +490,7 @@ Unity = {
                         Offset = string.format("%X",v.AddressMethod - Unity.GetStartLibAddress(v.AddressMethod)),
                         AddressInMemory = string.format("%X",v.AddressMethod),
                         AddressOffset = v.Address,
-                        Class = Unity.GetClassName(gg.getValues({{address = AddressClass + foril2cpp.num(1),flags = foril2cpp.type()}})[1].value),
+                        Class = Unity.Utf8ToString(gg.getValues({{address = AddressClass + foril2cpp.num(1),flags = foril2cpp.type()}})[1].value),
                         ClassAddress = string.format('%X', AddressClass)
                     }
                 else
@@ -499,7 +512,31 @@ Unity = {
                     or self.mClass[key])
             end
         })
-    end
+    end,
+    GetNumFields = function(self, ClassAddress)
+        return gg.getValues({{address = ClassAddress + self.NumFields, flags = gg.TYPE_WORD}})[1].value
+    end,
+    GetLinkFields = function(self, ClassAddress)
+        return gg.getValues({{address = ClassAddress + self.FieldsLink, flags = foril2cpp.type()}})[1].value
+    end,
+    SetFields = function(self, AddressClass)
+        self.ClassLoad = true
+        local FieldsCount, FieldsLink, RetTable = self:GetNumFields(AddressClass), self:GetLinkFields(AddressClass)
+        for i = 1, FieldsCount do
+            local field = foril2cpp.value(gg.getValues({{address = FieldsLink + ((i-1) * self.FieldsStep), flags = foril2cpp.type()}})[1].address)
+            local fieldInfo = gg.getValues({
+                {--NameField
+                    address = field,
+                    flags = foril2cpp.type()
+                },
+                {--Offset
+                    address = field + self.FieldsOffset,
+                    flags = gg.TYPE_WORD
+                },
+            })
+            self.Fields[self.Utf8ToString(foril2cpp.value(fieldInfo[1].value))] = fieldInfo[2].value
+        end
+    end,
 }
 
 function Unity:SetPrice(price)
@@ -516,6 +553,8 @@ function Unity:Unlock()
 end
 
 function SetUnityClass(t)
+    t.ClassLoad = false
+    t.Fields = {}
     return setmetatable(t,{__index = Unity})
 end
 
@@ -745,8 +784,114 @@ Dictionary = SetEnumClass({
             firstStep = platform and 0x18 or 0xC,
             step = platform and 0x18 or 0x10
         }
+    },
+    int = {
+        keySize = 0x4,
+        int = {
+            skip = platform and 0x4 or 0,
+            valueSize = 0x4,
+            firstStep = platform and 0x18 or 0xC,
+            step = platform and 0x14 or 0x10,
+            missKey = 0xC,
+            hashCode = 0x4,
+            next = 0x8,
+            key = 0xC,
+            value = 0x10,
+            size = 0x10
+        }
     }
 })
+
+function Dictionary:HasKey(dic, key)
+    local d = Dictionary:GetAllItemIntInt(dic)
+    return d[key] ~= nil, d
+end
+
+function Dictionary:GetAllItemIntInt(dic)
+    local link, num, tab = self:GetLink(dic), self:GetNumItem(dic), {}
+    if (not (num < 1) and num < 200) then
+        for i = 1, num do
+            local tmp = gg.getValues({
+                {
+                    address = link + self['int']['int'].firstStep + self['int']['int'].skip + (self['int']['int'].size * (i - 1)) + self['int']['int'].key,
+                    flags = gg.TYPE_DWORD
+                },
+                {
+                    address = link + self['int']['int'].firstStep + self['int']['int'].skip + (self['int']['int'].size * (i - 1)) + self['int']['int'].value,
+                    flags = gg.TYPE_DWORD
+                }
+            })
+            tab[tmp[1].value] = tmp[2].value
+        end
+    end
+    return tab
+end
+
+function Dictionary:SetItemIntInt(dic, key, val)
+    local numItem = self:GetNumItem(dic)
+    local linkmass = self:GetLink(dic)
+    if numItem > 0 and numItem < 1000 then
+        for i = 1, numItem do
+            local k = {
+                address = linkmass + self['int']['int'].firstStep + self['int']['int'].skip + (self['int']['int'].size * (i - 1)) + self['int']['int'].key,
+                flags = gg.TYPE_DWORD,
+            }
+            if (gg.getValues({k})[1].value == key) then
+                gg.setValues({{
+                    address = linkmass + self['int']['int'].firstStep + self['int']['int'].skip + (self['int']['int'].size * (i - 1)) + self['int']['int'].value,
+                    flags = gg.TYPE_DWORD,
+                    value = val
+                }})
+            end
+        end
+    end
+end
+
+function Dictionary:CreateDictionary(dic, tab, fristType, secondType)
+    local link, num, i = self:GetLink(dic), MyLenTable(tab), 0
+    local Head = gg.getValues({{address = link, flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value
+    local addressInMemory = GetAddressMemory(link, (self[fristType][secondType].firstStep + self['int']['int'].skip + (self[fristType][secondType].size * num)))
+    local NewDictionary = {
+        {
+            address = addressInMemory,
+            value = Head,
+            flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD,
+        },
+        {
+            address = addressInMemory + self[fristType][secondType].firstStep,
+            flags = gg.TYPE_DWORD,
+            value = num,
+        }
+    }
+    for k,v in pairs(tab) do
+        i = i + 1
+        table.move({
+            {
+                address = addressInMemory + self[fristType][secondType].firstStep + self['int']['int'].skip + (self[fristType][secondType].size * (i - 1)) + self[fristType][secondType].hashCode,
+                value = k,
+                flags = gg.TYPE_DWORD
+            },
+            {
+                address = addressInMemory + self[fristType][secondType].firstStep + self['int']['int'].skip + (self[fristType][secondType].size * (i - 1)) + self[fristType][secondType].next,
+                value = i - 2,
+                flags = gg.TYPE_DWORD
+            },
+            {
+                address = addressInMemory + self[fristType][secondType].firstStep + self['int']['int'].skip + (self[fristType][secondType].size * (i - 1)) + self[fristType][secondType].key,
+                value = k,
+                flags = gg.TYPE_DWORD
+            },
+            {
+                address = addressInMemory + self[fristType][secondType].firstStep + self['int']['int'].skip + (self[fristType][secondType].size * (i - 1)) + self[fristType][secondType].value,
+                value = v,
+                flags = gg.TYPE_DWORD
+            },
+        }, 1,4,#NewDictionary + 1, NewDictionary)
+    end
+    gg.setValues(NewDictionary)
+    self:SetLink(dic, addressInMemory) 
+    self:SetNumItem(dic, num)
+end
 
 function Dictionary:GetAllItemStringToStruct(dic,sizeStruct,offsetField,type)
     local numItem = self:GetNumItem(dic)
@@ -781,6 +926,10 @@ end
 
 function Dictionary:GetLink(dictionary)
     return gg.getValues({{address = dictionary + self.link,flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value
+end
+
+function Dictionary:SetLink(dictionary, newDictionary)
+    gg.setValues({{address = dictionary + self.link, flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD, value = newDictionary}})
 end
 
 function Dictionary:SetAllItemStringInt(dic,value)
@@ -820,9 +969,13 @@ function Dictionary:SetItemStringInt(dic, key, val)
 end
 
 SkillInfo = SetUnityClass({
+    cd = platform and 0x50 or 0x34,
     price = platform and 0x54 or 0x38,
     GetPrice = function()
         return SkillInfo.price
+    end,
+    GetTableForCd = function(self, add)
+        return {address = add + self.cd, flags = gg.TYPE_FLOAT, value = 0.01}
     end
 })
 
@@ -888,38 +1041,24 @@ RoomComodityData = SetUnityClass({
 })
 
 ItemData = SetUnityClass({
-    tokenTickets = platform and 0x58 or 0x30,
-    materials = platform and 0x50 or 0x2C,
-    seeds = platform and 0x48 or 0x28,
-    bossrush_time = platform and 0xa0 or 0x54,
-    sellerRefreshTime = platform and 0x18 or 0xc,
-    commodities = platform and 0x20 or 0x14,
-    weaponAdd = {
-        'weapon_276',
-        'weapon_276',
-        'weapon_276',
-        'weapon_276'
-    },
-    itemUnlock = platform and 0x28 or 0x18,
-    forgeWeapons = platform and 0x30 or 0x1C,
     SetTokens = function(self,value)
         for k,v in ipairs(self:GetLocalInstance()) do
-            Dictionary:SetAllItemStringInt(gg.getValues({{address = v.value + self.tokenTickets,flags = v.flags}})[1].value,value)
+            Dictionary:SetAllItemStringInt(gg.getValues({{address = v.value + self.Fields.tokenTickets,flags = v.flags}})[1].value,value)
         end
     end,
     SetMaterials = function(self,value)
         for k,v in ipairs(self:GetLocalInstance()) do
-            Dictionary:SetAllItemStringInt(gg.getValues({{address = v.value + self.materials,flags = v.flags}})[1].value,value)
+            Dictionary:SetAllItemStringInt(gg.getValues({{address = v.value + self.Fields.materials,flags = v.flags}})[1].value,value)
         end
     end,
     SetSeeds = function(self,value)
         for k,v in ipairs(self:GetLocalInstance()) do
-            Dictionary:SetAllItemStringInt(gg.getValues({{address = v.value + self.seeds,flags = v.flags}})[1].value,value)
+            Dictionary:SetAllItemStringInt(gg.getValues({{address = v.value + self.Fields.seeds,flags = v.flags}})[1].value,value)
         end
     end,
     SetPlant = function(self)
         for k,v in ipairs(self:GetLocalInstance()) do
-            List['string']:EditList(gg.getValues({{address = v.value + self.itemUnlock, flags = v.flags}})[1].value, {
+            List['string']:EditList(gg.getValues({{address = v.value + self.Fields.itemUnlock, flags = v.flags}})[1].value, {
                 'plant_pot3',
                 'plant_pot4',
                 'plant_pot5',
@@ -930,7 +1069,7 @@ ItemData = SetUnityClass({
     end,
     SetItemForge = function (self)
         for k,v in ipairs(self:GetLocalInstance()) do
-            local linkList = gg.getValues({{address = v.value + self.forgeWeapons, flags = v.flags}})[1].value
+            local linkList = gg.getValues({{address = v.value + self.Fields.forgeWeapons, flags = v.flags}})[1].value
             local list = List['string']:GetList(linkList)
             local weaponNum = gg.choice(list)
             if weaponNum then 
@@ -952,19 +1091,19 @@ ItemData = SetUnityClass({
     end,
     AddMotor = function(self)
         for k,v in ipairs(self:GetLocalInstance()) do
-            List['string']:EditList(gg.getValues({{address = v.value + self.itemUnlock, flags = v.flags}})[1].value, {'Motorcycle'}, true)
+            List['string']:EditList(gg.getValues({{address = v.value + self.Fields.itemUnlock, flags = v.flags}})[1].value, {'Motorcycle'}, true)
         end
     end,
     EditTimesBossRush = function(self)
         for k,v in ipairs(self:GetLocalInstance()) do
-            gg.setValues({{address = v.value + self.bossrush_time, flags = gg.TYPE_DWORD, value = 0}})
+            gg.setValues({{address = v.value + self.Fields.bossrush_time, flags = gg.TYPE_DWORD, value = 0}})
         end
     end,
     ResetSeller = function(self)
         for k,v in ipairs(self:GetLocalInstance()) do
-            gg.setValues({{address = v.value + self.sellerRefreshTime, flags = gg.TYPE_DWORD, value = 0}})
+            gg.setValues({{address = v.value + self.Fields.sellerRefreshTime, flags = gg.TYPE_DWORD, value = 0}})
             local items = {}
-            for n,cl in ipairs(Massiv:From(List:GetLink(gg.getValues({{address = v.value + self.commodities, flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value)):GetAllElement('link')) do
+            for n,cl in ipairs(Massiv:From(List:GetLink(gg.getValues({{address = v.value + self.Fields.commodities, flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value)):GetAllElement('link')) do
                 local item = RoomComodityData:From(cl.value)
                 if (item:GetCount() == 0) then 
                     items[#items + 1] = item:GetTabelForReset()
@@ -986,23 +1125,20 @@ UIWeaponStation = SetUnityClass({
 })
 
 SkinMaterialRelation = SetUnityClass({
-    material_list = platform and 0x18 or 0x10,
     HackSkinMaterial = function(self) 
         for k,v in ipairs(self:GetInstance()) do
-            local list = List:From(gg.getValues({{address = v.address + self.material_list, flags = v.flags}})[1].value)
+            local list = List:From(gg.getValues({{address = v.address + self.Fields.material_list, flags = v.flags}})[1].value)
             if (list:GetNumItem() > 0) then list:SetNumItem(0) end
         end
     end
 })
 
 ItemBluePrint = SetUnityClass({
-    noBlueprint = platform and 0xF0 or 0x88,
-    researchMaterial = platform and 0xE8 or 0x84,
     HackBluePrint = function(self)
         for k,v in ipairs(self:GetInstance()) do
-            local dec = Dictionary:From(gg.getValues({{address = v.address + self.researchMaterial,flags = v.flags}})[1].value)
+            local dec = Dictionary:From(gg.getValues({{address = v.address + self.Fields.researchMaterial,flags = v.flags}})[1].value)
             if (GetRegionValue(dec.address) == "A") then 
-                if (gg.getValues({{address = v.address + self.noBlueprint,flags = gg.TYPE_BYTE}})[1].value == 0) then gg.setValues({{address = v.address + self.noBlueprint,flags = gg.TYPE_BYTE, value = 1}}) end
+                if (gg.getValues({{address = v.address + self.Fields.noBlueprint,flags = gg.TYPE_BYTE}})[1].value == 0) then gg.setValues({{address = v.address + self.Fields.noBlueprint,flags = gg.TYPE_BYTE, value = 1}}) end
                 if (dec:GetNumItem() > 0) then dec:SetNumItem(0) end
             end
         end
@@ -1060,7 +1196,7 @@ StatisticData = SetUnityClass({
     end,
     SetPower = function(self)
         for k,v in ipairs(self:GetInstance()) do
-            Dictionary:From(gg.getValues({{address = v.address + self.event2Count, flags = v.flags}})[1].value):SetItemStringInt('hero_char_useable_value', 100)
+            Dictionary:From(gg.getValues({{address = v.address + self.Fields.event2Count, flags = v.flags}})[1].value):SetItemStringInt('hero_char_useable_value', 100)
         end
     end
 })
@@ -1089,11 +1225,10 @@ TermData = SetUnityClass({
 })
 
 WeaponInfo = SetUnityClass({
-    weapons = platform and 0x10 or 0x8,
     UnlockAllWeapon = function(self)
         local items = {}
         for k,v in ipairs(self:GetLocalInstance()) do
-            for key,weapon in ipairs(Massiv:From(List:GetLink(gg.getValues({{address = v.value + self.weapons, flags = v.flags}})[1].value)):GetAllElement('link')) do
+            for key,weapon in ipairs(Massiv:From(List:GetLink(gg.getValues({{address = v.value + self.Fields.weapons, flags = v.flags}})[1].value)):GetAllElement('link')) do
                 local item = WeaponInfoRow:From(weapon.value)
                 if (item:Getforgeable() == 0) then items[#items + 1] = item:GetTableforforgeable() end
             end
@@ -1126,14 +1261,12 @@ UIForge = SetUnityClass({
 })
 
 RGGameProcess = SetUnityClass({
-    coin_value = platform and 0x1C or 0x10,
-    this_index = platform and 0x18 or 0xC,
     AddCoin = function(self,num)
         for k,v in ipairs(self:GetParentLocalInstance()) do
-            local coin_value = gg.getValues({{address = v.value + self.coin_value,flags = gg.TYPE_DWORD}})[1].value
-            local this_index = gg.getValues({{address = v.value + self.this_index,flags = gg.TYPE_DWORD}})[1].value
+            local coin_value = gg.getValues({{address = v.value + self.Fields.coin_value,flags = gg.TYPE_DWORD}})[1].value
+            local this_index = gg.getValues({{address = v.value + self.Fields.this_index,flags = gg.TYPE_DWORD}})[1].value
             if this_index >= 0 and this_index < 1000000000 then
-                gg.setValues({{address = v.value + self.coin_value,flags = gg.TYPE_DWORD, value = coin_value + num}})
+                gg.setValues({{address = v.value + self.Fields.coin_value,flags = gg.TYPE_DWORD, value = coin_value + num}})
             end
         end
     end
@@ -1149,20 +1282,20 @@ ItemSellPlaceGem = SetUnityClass({
     the_item = platform and 0xd8 or 0x78,
     SetPrice = function(self,num)
         for k,v in ipairs(self:GetInstance()) do
-            local unlockByTv = gg.getValues({{address = v.address + self.unlockByTv,flags = gg.TYPE_BYTE}})[1].value
+            local unlockByTv = gg.getValues({{address = v.address + self.Fields.unlockByTv,flags = gg.TYPE_BYTE}})[1].value
             switch(unlockByTv, {
                 [0] = function() 
-                    local the_item = gg.getValues({{address = v.address + self.the_item,flags = v.flags}})[1].value
+                    local the_item = gg.getValues({{address = v.address + self.Fields.the_item,flags = v.flags}})[1].value
                     if (GetRegionValue(the_item) == "A") then
                         gg.setValues({{address = self.saveItems[v.address] and the_item + RGWeapon.item_value or the_item + RGItem.item_value, flags = gg.TYPE_DWORD,value = num}})
                     end
                 end,
                 [1] = function()
-                    local the_item = gg.getValues({{address = v.address + self.the_item,flags = v.flags}})[1].value
+                    local the_item = gg.getValues({{address = v.address + self.Fields.the_item,flags = v.flags}})[1].value
                     self.saveItems[v.address] = true
                     gg.setValues({
                         {
-                            address = v.address + self.unlockByTv,
+                            address = v.address + self.Fields.unlockByTv,
                             flags = gg.TYPE_BYTE,
                             value = 0
                         },
@@ -1179,12 +1312,11 @@ ItemSellPlaceGem = SetUnityClass({
 })
 
 PlantInfo = SetUnityClass({
-    state = platform and 0x18 or 0xC,
     GrowAllSeeds = function(self)
         local EditPlot = {}
         for k,v in ipairs(self:GetInstance()) do
-            local state = gg.getValues({{address = v.address + self.state, flags = gg.TYPE_DWORD}})[1].value
-            EditPlot[#EditPlot + 1] = (state >= 0 and state < 4) and {address = v.address + self.state,flags = gg.TYPE_DWORD,value = 4} or nil 
+            local state = gg.getValues({{address = v.address + self.Fields.state, flags = gg.TYPE_DWORD}})[1].value
+            EditPlot[#EditPlot + 1] = (state >= 0 and state < 4) and {address = v.address + self.Fields.state,flags = gg.TYPE_DWORD,value = 4} or nil 
         end
         gg.setValues(EditPlot)
     end
@@ -1250,14 +1382,20 @@ RGController = { --!!!
         local instance = RGGameSceneManager:GetController()
         local RB = gg.getValues({{address = instance + self.rigibody,flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value
         return gg.getValues({{address = RB ,flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})
+    end,
+    NoSkillCd = function(self)
+        local instance, skills = RGGameSceneManager:GetController(), {}
+        for k,v in ipairs(Massiv:GetAllElement(gg.getValues({{address = instance + 0x170, flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value, 'link')) do
+            skills[#skills + 1] = SkillInfo:GetTableForCd(v.value)
+        end
+        gg.setValues(skills)
     end
 }
 
 RGGameSceneManager = SetUnityClass({
-    controller = platform and 0x28 or 0x14,
     GetController = function (self)
         for k,v in ipairs(self:GetLocalInstance()) do
-            return gg.getValues({{address = v.value + self.controller,flags = v.flags}})[1].value
+            return gg.getValues({{address = v.value + self.Fields.controller,flags = v.flags}})[1].value
         end
     end
 })
@@ -1414,12 +1552,10 @@ RGWeapon = {
 }
 
 RGSaveManager = SetUnityClass({
-    pet_list = platform and 0x20 or 0x10,
-    char_list = platform and 0x18 or 0xC,
     SetPricePet = function (self, price)
         local pets = {}
         for k,v in ipairs(self:GetLocalInstance()) do
-            for key,value in ipairs(Massiv:GetAllElement(gg.getValues({{address = v.value + self.pet_list, flags = v.flags}})[1].value,"link")) do
+            for key,value in ipairs(Massiv:GetAllElement(gg.getValues({{address = v.value + self.Fields.pet_list, flags = v.flags}})[1].value,"link")) do
                 pets[#pets + 1] = RGPetInfo:From(value.value):GetTableForUnlockGem(price)
             end
         end
@@ -1428,7 +1564,7 @@ RGSaveManager = SetUnityClass({
     SetPriceChar = function(self, price)
         local chars = {}
         for k,v in ipairs(self:GetLocalInstance()) do
-            for key,value in ipairs(Massiv:GetAllElement(gg.getValues({{address = v.value + self.char_list, flags = v.flags}})[1].value,"link")) do
+            for key,value in ipairs(Massiv:GetAllElement(gg.getValues({{address = v.value + self.Fields.char_list, flags = v.flags}})[1].value,"link")) do
                 chars[#chars + 1] = RGCharacterInfo:From(value.value):GetTableForUnlockGem(price)
             end
         end
@@ -1437,7 +1573,7 @@ RGSaveManager = SetUnityClass({
     SetSkinPrice = function(self, price)
         local skins = {}
         for k,v in ipairs(self:GetLocalInstance()) do
-            for key,value in ipairs(Massiv:GetAllElement(gg.getValues({{address = v.value + self.char_list, flags = v.flags}})[1].value,"link")) do
+            for key,value in ipairs(Massiv:GetAllElement(gg.getValues({{address = v.value + self.Fields.char_list, flags = v.flags}})[1].value,"link")) do
                 local skin = RGCharacterInfo:From(value.value):GetTableForSkins(price)
                 table.move(skin, 1, #skin, #skins + 1, skins)
             end
@@ -1449,11 +1585,38 @@ RGSaveManager = SetUnityClass({
 emBuff = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,1000,1001,1003,1004,1005,1006,1007,1008,1009}
 
 BattleData = SetUnityClass({
-    buffs = platform and 0xA0 or 0x74,
+    attributeAddition = platform and 0x150 or 0xD8,
     GetAllBuffs = function(self)
         for k, v in ipairs(self:GetLocalInstance()) do
-            local list = gg.getValues({{address = v.value + self.buffs, flags = v.flags}})[1].value
+            local list = gg.getValues({{address = v.value + self.Fields.buffs, flags = v.flags}})[1].value
             if (list ~= 0) then List['int']:EditList(list, emBuff, true) end
+        end
+    end,
+    NoSkillCd = function(self)
+        for k, v in ipairs(self:GetLocalInstance()) do
+            local dic = gg.getValues({{address = v.value + self.attributeAddition, flags = v.flags}})[1].value
+            if (dic ~= 0) then  
+                local has, mass = Dictionary:HasKey(dic, 9)
+                if has then 
+                    Dictionary:SetItemIntInt(dic, 9, 1)
+                else
+                    mass[9] = 1
+                    Dictionary:CreateDictionary(dic, mass, 'int', 'int')
+                end
+            end
+        end
+    end
+})
+
+ItemDrinkSeller = SetUnityClass({
+    drinkDistribute = 0xA8,
+    Test = function(self)
+        for k,v in ipairs(self:GetInstance()) do
+            for key, drink in ipairs(Massiv:GetAllElement(gg.getValues({{address = v.address + self.drinkDistribute, flags = v.flags}})[1].value,"link")) do
+                local tmp = gg.getValues({{address = drink.value + 0x10, flags = gg.TYPE_QWORD}})[1].value
+                tmp = gg.getValues({{address = tmp + 0x10, flags = gg.TYPE_QWORD}})[1].value
+                print(Unity.Utf8ToString(gg.getValues({{address = tmp + 0x60, flags = gg.TYPE_QWORD}})[1].value))
+            end
         end
     end
 })
@@ -1640,6 +1803,9 @@ functions = {
     ['ADD ALL BUFFS'] = function()
         Protect:Call(BattleData.GetAllBuffs, BattleData)
     end,
+    ['NO SKILL CD'] = function()
+        Protect:Call(BattleData.NoSkillCd, BattleData)
+    end
 }
 
 while true do
