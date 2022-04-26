@@ -205,25 +205,6 @@ end
 
 data, platform, libil = GetAppData()
 
-foril2cpp = {
-    ['num'] = function(id) return platform and foril2cpp[id .. 'x64'] or foril2cpp[id .. 'x32'] end,
-    ['1x64'] = 0x10,
-    ['1x32'] = 0x8,
-    ['2x64'] = '!/lib/arm64-v8a/libil2cpp.so',
-    ['2x32'] = '!/lib/armeabi-v7a/libil2cpp.so',
-    ['3x64'] = 0x8,
-    ['3x32'] = 0x4,
-    ['4x64'] = 0x18,
-    ['4x32'] = 0xC,
-    ['5x64'] = 0xC,
-    ['5x32'] = 0x8,
-    ['type'] = function() return platform and gg.TYPE_QWORD or gg.TYPE_DWORD end,
-    ['value'] = function(ret)
-        if not platform then return ret & 0xFFFFFFFF end
-        return ret
-    end
-}
-
 if #libil == 0 then
     local splitconf = gg.getRangesList('split_config.')
     gg.setRanges(gg.REGION_CODE_APP)
@@ -253,7 +234,7 @@ function Il2CppName(NameFucntion)
     gg.clearResults()
     for key, value in ipairs(r) do
         if gg.BUILD < 16126 then 
-            gg.searchNumber(string.format("%8.8X", foril2cpp.value(value.address)) .. 'h',foril2cpp.type())
+            gg.searchNumber(string.format("%8.8X", fixvalue32(value.address)) .. 'h', Unity.MainType)
         else 
             gg.loadResults({value})
             gg.searchPointer(0)
@@ -261,8 +242,8 @@ function Il2CppName(NameFucntion)
         local MethodsInfo = gg.getResults(gg.getResultsCount())
         gg.clearResults()
         for k, v in ipairs(MethodsInfo) do
-            v.address = v.address - foril2cpp.num(1)
-            local FinalAddress = foril2cpp.value(gg.getValues({v})[1].value)
+            v.address = v.address - Unity.MethodNameOffset
+            local FinalAddress = fixvalue32(gg.getValues({v})[1].value)
             if (FinalAddress > libil[1].start and FinalAddress < libil[#libil]['end']) then 
                 FinalMethods[#FinalMethods + 1] = {
                     AddressMethod = FinalAddress,
@@ -366,7 +347,7 @@ function GetAddressMemory(startAddress, add)
     return localPageMemory
 end
 
-local function fixvalue32(value)
+function fixvalue32(value)
     return platform and value or value & 0xFFFFFFFF
 end
 
@@ -376,19 +357,21 @@ function MyLenTable(t)
     return ret
 end
 
-function IsClass(address)
+function DataCheck(address)
     return (fixvalue32(address) > fixvalue32(data[1].start) and fixvalue32(address) < fixvalue32(data[1]['end']))
 end
 
 Unity = {
-    DefaultOffset1 = platform and 0x10 or 0x8,
-    DefaultOffset2 = platform and 0x8 or 0x4,
-    DefaultOffset3 = platform and 0xB8 or 0x5C,
+    ClassNameOffset = platform and 0x10 or 0x8,
+    StaticFieldsOffset = platform and 0xB8 or 0x5C,
     ParentOffset = platform and 0x58 or 0x2C,
     NumFields = platform and 0x120 or 0xA8,
     FieldsLink = platform and 0x80 or 0x40,
     FieldsStep = platform and 0x20 or 0x14,
-    FieldsOffset = platform and 0x18 or 0xC,  
+    FieldsOffset = platform and 0x18 or 0xC, 
+    MethodClassOffset = platform and 0x18 or 0xC, 
+    MethodNameOffset = platform and 0x10 or 0x8,
+    MainType = platform and gg.TYPE_QWORD or gg.TYPE_DWORD,
     GetClass = function(self, ClassName)
         gg.clearResults()
         gg.setRanges(0)
@@ -400,11 +383,11 @@ Unity = {
         gg.clearResults()
         if (#res > 1) then
             for k,v in ipairs(res) do
-                local assembly = gg.getValues({{address = v.address - Unity.DefaultOffset1,flags = v.flags}})[1].value
-                if (IsClass(gg.getValues({{address = assembly ,flags = v.flags}})[1].value)) then res[1] = v end
+                local assembly = gg.getValues({{address = v.address - Unity.ClassNameOffset,flags = v.flags}})[1].value
+                if (DataCheck(gg.getValues({{address = assembly ,flags = v.flags}})[1].value)) then res[1] = v end
             end
         end
-        if not self.ClassLoad then self:SetFields(res[1].address - Unity.DefaultOffset1) end
+        if not self.ClassLoad then self:SetFields(res[1].address - Unity.ClassNameOffset) end
         return res[1]
     end,
     GetStartLibAddress = function(Address)
@@ -432,7 +415,7 @@ Unity = {
         local Instances, ClassName = {}, GetNameTableInGlobalSpace(self)
         local MemClass = self:GetClass(ClassName)
         gg.loadResults({MemClass})
-        gg.searchPointer(self.DefaultOffset1)
+        gg.searchPointer(self.ClassNameOffset)
         local r = gg.getResults(gg.getResultsCount())
         for k,v in ipairs(gg.getValuesRange(r)) do
             Instances[#Instances + 1] = v == 'A' and r[k] or nil
@@ -446,7 +429,7 @@ Unity = {
     GetLocalInstance = function(self) 
         local Instances, ClassName = {}, GetNameTableInGlobalSpace(self)
         local MemClass = self:GetClass(ClassName)
-        local tmp = gg.getValues({{address = MemClass.address - self.DefaultOffset1 + self.DefaultOffset3,flags = MemClass.flags}})
+        local tmp = gg.getValues({{address = MemClass.address - self.ClassNameOffset + self.StaticFieldsOffset,flags = MemClass.flags}})
         table.move(gg.getValues({{address = tmp[1].value,flags = tmp[1].flags}}),1,1,#Instances + 1,Instances)
         gg.toast(lang_main[ClassName] or "")
         gg.clearResults()
@@ -455,15 +438,15 @@ Unity = {
     GetParentLocalInstance = function(self) 
         local Instances, ClassName = {}, GetNameTableInGlobalSpace(self)
         local MemClass = self:GetClass(ClassName)
-        local tmp = gg.getValues({{address = MemClass.address - self.DefaultOffset1 + self.ParentOffset,flags = MemClass.flags}})[1].value
-        tmp = gg.getValues({{address = tmp + self.DefaultOffset3,flags = MemClass.flags}})
+        local tmp = gg.getValues({{address = MemClass.address - self.ClassNameOffset + self.ParentOffset,flags = MemClass.flags}})[1].value
+        tmp = gg.getValues({{address = tmp + self.StaticFieldsOffset,flags = MemClass.flags}})
         table.move(gg.getValues({{address = tmp[1].value,flags = tmp[1].flags}}),1,1,#Instances + 1,Instances)
         gg.toast(lang_main[ClassName] or "")
         gg.clearResults()
         return Instances
     end,
     Utf8ToString = function(Address)
-        local bytes, char = {}, {address = foril2cpp.value(Address), flags = gg.TYPE_BYTE}
+        local bytes, char = {}, {address = fixvalue32(Address), flags = gg.TYPE_BYTE}
         while gg.getValues({char})[1].value > 0 do
             bytes[#bytes + 1] = {address = char.address, flags = char.flags}
             char.address = char.address + 0x1
@@ -484,13 +467,13 @@ Unity = {
             local finaladdres = Il2CppName(namefucntion)
             for k,v in pairs(finaladdres) do
                 if (k ~= 'Error') then
-                    local AddressClass = foril2cpp.value(gg.getValues({{address = v.Address + foril2cpp.num(4),flags = foril2cpp.type()}})[1].value)
+                    local AddressClass = fixvalue32(gg.getValues({{address = v.Address + Unity.MethodClassOffset,flags = Unity.MainType}})[1].value)
                     RetIl2CppFuncs[#RetIl2CppFuncs + 1] = {
                         NameFucntion = namefucntion,
                         Offset = string.format("%X",v.AddressMethod - Unity.GetStartLibAddress(v.AddressMethod)),
                         AddressInMemory = string.format("%X",v.AddressMethod),
                         AddressOffset = v.Address,
-                        Class = Unity.Utf8ToString(gg.getValues({{address = AddressClass + foril2cpp.num(1),flags = foril2cpp.type()}})[1].value),
+                        Class = Unity.Utf8ToString(gg.getValues({{address = AddressClass + Unity.ClassNameOffset,flags = Unity.MainType}})[1].value),
                         ClassAddress = string.format('%X', AddressClass)
                     }
                 else
@@ -517,24 +500,24 @@ Unity = {
         return gg.getValues({{address = ClassAddress + self.NumFields, flags = gg.TYPE_WORD}})[1].value
     end,
     GetLinkFields = function(self, ClassAddress)
-        return gg.getValues({{address = ClassAddress + self.FieldsLink, flags = foril2cpp.type()}})[1].value
+        return gg.getValues({{address = ClassAddress + self.FieldsLink, flags = Unity.MainType}})[1].value
     end,
     SetFields = function(self, AddressClass)
         self.ClassLoad = true
-        local FieldsCount, FieldsLink, RetTable = self:GetNumFields(AddressClass), self:GetLinkFields(AddressClass)
+        local FieldsCount, FieldsLink = self:GetNumFields(AddressClass), fixvalue32(self:GetLinkFields(AddressClass)) 
         for i = 1, FieldsCount do
-            local field = foril2cpp.value(gg.getValues({{address = FieldsLink + ((i-1) * self.FieldsStep), flags = foril2cpp.type()}})[1].address)
+            local field = FieldsLink + ((i-1) * self.FieldsStep)
             local fieldInfo = gg.getValues({
                 {--NameField
                     address = field,
-                    flags = foril2cpp.type()
+                    flags = Unity.MainType
                 },
                 {--Offset
                     address = field + self.FieldsOffset,
                     flags = gg.TYPE_WORD
                 },
             })
-            self.Fields[self.Utf8ToString(foril2cpp.value(fieldInfo[1].value))] = fieldInfo[2].value
+            self.Fields[self.Utf8ToString(fixvalue32(fieldInfo[1].value))] = fieldInfo[2].value
         end
     end,
 }
