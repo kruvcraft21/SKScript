@@ -117,6 +117,18 @@ langClass = {
 
 lang_main = setmetatable(lang[gg.getLocale()] or lang['en_US'], {__index = langClass[gg.getLocale()] or langClass['en_US']})
 
+Utf16 = {}
+
+for s in string.gmatch('АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя', "..") do
+    local char = gg.bytes(s,'UTF-16LE')
+    Utf16[char[1] + (char[2] * 256)] = s
+end
+
+for s in string.gmatch("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_/0123456789-'", ".") do
+    local char = gg.bytes(s,'UTF-16LE')
+    Utf16[char[1] + (char[2] * 256)] = s
+end
+
 function switch(check,table,e)
     return ({
         xpcall(
@@ -158,30 +170,11 @@ function GetNameTableInGlobalSpace(table)
     return ""
 end
 
-function CheckIsGame(PackageName)
-    local data = gg.getRangesList('global-metadata.dat') 
-    if data == nil or data[1] == nil or data[1].start <= 0 or string.find(data[1].internalName,PackageName) == nil then
-        gg.alert(lang_main.AppNoSK .. '\n' .. lang_main.ErrorData)
-        return nil
-    end
-    return data
-end
-
-function CheckIsUnityGame()
-    local il2cpp = gg.getRangesList('libil2cpp.so')
-    if il2cpp == nil or il2cpp[1] == nil or il2cpp[1].start <= 0 then
-        gg.alert(lang_main.AppNoSK .. '\n' .. lang_main.ErrorData) 
-        return {}, 'Is not Unity Game' 
-    end
-    return il2cpp, 'true' 
-end
-
 function GetInfoFropApps()
-    --local data = CheckIsGame('com.ChillyRoom.DungeonShooter') -- local data = gg.getRangesList('global-metadata.dat') 
     local data = gg.getRangesList('global-metadata.dat') 
-    local il2cpp, code = CheckIsUnityGame()
+    local il2cpp = gg.getRangesList('libil2cpp.so')
     local info = gg.getTargetInfo()
-    if info and code == 'true' then return info.x64, data end
+    if info then return info.x64, data end
     if #il2cpp ~= 0 then
         local check = string.gsub(il2cpp[1].internalName,'%/.-%/lib/','')
         check = switch(check,{
@@ -264,57 +257,14 @@ function addresspath(StartAddress, ...)
     end
 end
 
-function CreatAlf()
-    local tablechar = gg.bytes("АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюяABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_/0123456789-'",'UTF-16LE')
-    local tablegg = {}
-
-    for k,v in ipairs(tablechar) do
-        if k%2 > 0 then
-            tablegg[#tablegg + 1] = v == 1 and string.format('0%x',v) or string.format('%x',v)
-        else
-            tablegg[#tablegg] = string.format('%x',v) .. tablegg[#tablegg]
-        end
-    end
-
-    local tablechar = {}
-
-    for token in string.gmatch('АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя', "..") do
-        tablechar[#tablechar + 1] = token
-    end
-
-    for token in string.gmatch("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_/0123456789-'", ".") do
-        tablechar[#tablechar + 1] = token
-    end
-
-    gs.alfUTF16 = {}
-
-    for k,v in pairs(tablegg) do
-        gs.alfUTF16[tonumber(v,16)] = tablechar[k]
-    end
-end
-
-function ReadString(link)
-    if not alfUTF16 then CreatAlf() end 
-    num = gg.getValues({{address = link + (platform and 0x10 or 0x8),flags = gg.TYPE_DWORD}})[1].value
-    local result = ""
-    if num > 0 and num < 200 then
-        for i = 1, num + 1 do
-            local key = gg.getValues({{address = link + (platform and 0x10 or 0x8) + (i * 0x2),flags = gg.TYPE_WORD}})[1].value
-            result = result .. (key == 32 and " " or (alfUTF16[key] or ""))
-        end
-    end
-    return result
-end
-
 function GetRegionValue(address) 
     return gg.getValuesRange({address})[1]
 end
 
 function StringToTable(s)
-    if not alfUTF16 then CreatAlf() end 
     rTable = {}
     for str in string.gmatch(s,".") do
-        for k,v in pairs(alfUTF16) do
+        for k,v in pairs(Utf16) do
             rTable[#rTable + 1] = v == str and k or nil
         end
     end
@@ -459,6 +409,23 @@ Unity = {
                 return table.concat(self)
             end
         }))
+    end,
+    Utf16ToString = function(Address)
+        local bytes, strAddress = {}, fixvalue32(Address) + (platform and 0x10 or 0x8)
+        local num = gg.getValues({{address = strAddress,flags = gg.TYPE_DWORD}})[1].value
+        if num > 0 and num < 200 then
+            for i = 1, num + 1 do
+                bytes[#bytes + 1] = {address = strAddress + (i * 0x2), flags = gg.TYPE_WORD}
+            end
+        end
+        return #bytes > 0 and tostring(setmetatable(gg.getValues(bytes), {
+            __tostring = function(self)
+                for k,v in ipairs(self) do
+                    self[k] = v.value == 32 and " " or (Utf16[v.value] or "")
+                end
+                return table.concat(self)
+            end
+        })) or ""
     end,
     GetIl2cppFunc = function(...)
         local args, RetIl2CppFuncs = {...}, {}
@@ -649,7 +616,7 @@ List['string'] = SetSubClass({
     end,
     Filter = function(t)
         for k,v in pairs(t) do
-            t[k] = v.value == 0 and lang_main.Emtry or ReadString(v.value)
+            t[k] = v.value == 0 and lang_main.Emtry or Unity.Utf16ToString(v.value)
         end
         return t
     end,
@@ -940,7 +907,7 @@ function Dictionary:SetItemStringInt(dic, key, val)
                 address = linkmass + self.string.int.firstStep + (self.string.int.missKey * i) + (self.string.keySize * (i - 1)),
                 flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD,
             }
-            if (ReadString(gg.getValues({tmp})[1].value) == key) then
+            if (Unity.Utf16ToString(gg.getValues({tmp})[1].value) == key) then
                 gg.setValues({{
                     address = linkmass + self.string.int.firstStep + ((self.string.int.missKey + self.string.keySize) * i),
                     flags = gg.TYPE_DWORD,
@@ -1194,11 +1161,11 @@ TermData = SetUnityClass({
         for k,v,length in lpairs(self:GetInstance()) do
             local CheckTerm = gg.getValues({{address = v.address + self.Term,flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value
             if CheckTerm ~= 0 then
-                local tmpString = ReadString(CheckTerm)
+                local tmpString = self.Utf16ToString(CheckTerm)
                 if string.find(tmpString,'weapon/') then
                     local tmp = gg.getValues({{address = v.address + self.Languages,flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value
                     tmp = gg.getValues({{address = tmp + self.English,flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value
-                    WeaponTable[string.gsub(tmpString,'%weapon/.-','')] = ReadString(tmp)
+                    WeaponTable[string.gsub(tmpString,'%weapon/.-','')] = self.Utf16ToString(tmp)
                 end
             end
             gg.toast(k .. '/' .. length)
