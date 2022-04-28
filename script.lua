@@ -454,6 +454,7 @@ Unity = {
         return RetIl2CppFuncs,'true'
     end,
     From = function (self, a)
+        if not self.ClassLoad then self:SetFields(gg.getValues({{address = fixvalue32(a), flags = Unity.MainType}})[1].value) end
         return setmetatable({address = a, mClass = self}, {
             __index = function(self, key)
                 local check = switch((self.address and self.mClass) and (self.mClass[key] and 1 or -1) or 0 , {[0] = 'Не все поля заполнены', [-1] = 'В таблице нет поля ' .. key})
@@ -470,6 +471,7 @@ Unity = {
         return gg.getValues({{address = ClassAddress + self.FieldsLink, flags = Unity.MainType}})[1].value
     end,
     SetFields = function(self, AddressClass)
+        AddressClass = fixvalue32(AddressClass)
         self.ClassLoad = true
         local FieldsCount, FieldsLink = self:GetNumFields(AddressClass), fixvalue32(self:GetLinkFields(AddressClass)) 
         for i = 1, FieldsCount do
@@ -492,13 +494,6 @@ Unity = {
 function Unity:SetPrice(price)
     for k,v in ipairs(self:GetInstance()) do
         gg.setValues({{address = v.address + self.GetPrice(),flags = gg.TYPE_DWORD,value = price}})
-    end
-end
-
-function Unity:Unlock()
-    local offset, type = self.GetUnlock()
-    for k,v in ipairs(self:GetInstance()) do
-        gg.setValues({{address = v.address + offset,flags = type, value = 1}})
     end
 end
 
@@ -930,21 +925,12 @@ SkillInfo = SetUnityClass({
 })
 
 RGCharacterInfo = SetUnityClass({
-    unlock_gem = platform and 0x20 or 0x14,
-    GetPrice = function()
-        return RGCharacterInfo.unlock_gem
-    end,
-    unlock = platform and 0x18 or 0xC,
-    GetUnlock = function()
-        return RGCharacterInfo.unlock , gg.TYPE_BYTE
-    end,
-    skin_list = platform and 0x28 or 0x1C,
     GetTableForUnlockGem = function(self, add, num)
-        return {address = add + self.unlock_gem, flags = gg.TYPE_DWORD, value = num}
+        return {address = add + self.Fields.unlock_gem, flags = gg.TYPE_DWORD, value = num}
     end,
     GetTableForSkins = function(self, add, num)
         local skin = {}
-        for k,v in ipairs(Massiv:From(gg.getValues({{address = add + self.skin_list,flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value):GetAllElement('int')) do
+        for k,v in ipairs(Massiv:From(gg.getValues({{address = add + self.Fields.skin_list,flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value):GetAllElement('int')) do
             if (k ~= 1 and v.value ~= 1) then
                 v.value = num
                 skin[#skin + 1] = v
@@ -955,7 +941,7 @@ RGCharacterInfo = SetUnityClass({
     SetSkinPrice = function(self,num)
         local skins = {}
         for k,v in ipairs(self:GetInstance()) do
-            for item,tab in ipairs(Massiv:From(gg.getValues({{address = v.address + self.skin_list,flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value):GetAllElement('int')) do
+            for item,tab in ipairs(Massiv:From(gg.getValues({{address = v.address + self.Fields.skin_list,flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value):GetAllElement('int')) do
                 if (item ~= 1 and tab.value ~= 1) then 
                     tab.value = num 
                     skins[#skins + 1] = tab
@@ -967,26 +953,17 @@ RGCharacterInfo = SetUnityClass({
 })
 
 RGPetInfo = SetUnityClass({
-    unlock_gem = platform and 0x14 or 0xC,
-    GetPrice = function()
-        return RGPetInfo.unlock_gem
-    end,
-    unlock = platform and 0x10 or 0x8,
-    GetUnlock = function()
-        return RGPetInfo.unlock , gg.TYPE_BYTE
-    end,
     GetTableForUnlockGem = function(self, add, num)
-        return {address = add + self.unlock_gem, flags = gg.TYPE_DWORD, value = num}
+        return {address = add + self.Fields.unlock_gem, flags = gg.TYPE_DWORD, value = num}
     end
 })
 
 RoomComodityData = SetUnityClass({
-    count = platform and 0x18 or 0xc, 
     GetCount = function(self, address)
-        return gg.getValues({{address = address + self.count, flags = gg.TYPE_DWORD}})[1].value
+        return gg.getValues({{address = address + self.Fields.count, flags = gg.TYPE_DWORD}})[1].value
     end,
     GetTabelForReset = function(self, add)
-        return {address = add + self.count, value = 1, flags = gg.TYPE_DWORD}
+        return {address = add + self.Fields.count, value = 1, flags = gg.TYPE_DWORD}
     end
 })
 
@@ -1188,12 +1165,11 @@ WeaponInfo = SetUnityClass({
 })
 
 WeaponInfoRow = SetUnityClass({
-    forgeable = platform and 0x39 or 0x21,
     Getforgeable = function(self, add) 
-        return gg.getValues({{address = add + self.forgeable, flags = gg.TYPE_BYTE}})[1].value
+        return gg.getValues({{address = add + self.Fields.forgeable, flags = gg.TYPE_BYTE}})[1].value
     end,
     GetTableforforgeable = function(self, add)
-        return {address = add + self.forgeable, flags = gg.TYPE_BYTE, value = 1}
+        return {address = add + self.Fields.forgeable, flags = gg.TYPE_BYTE, value = 1}
     end
 })
 
