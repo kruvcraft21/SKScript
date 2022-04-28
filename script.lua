@@ -6,7 +6,7 @@ lang = {
         "УБРАТЬ МАТЕРИАЛЫ СО СТОЛА КОНСТРУКТОРА",
         "РАЗБЛОКИРОВАТЬ ВСЕ ОРУЖИЕ НА СТОЛЕ КУЗНЕЦА",
         "ДОБАВИТЬ ВСЕ БАФЫ",
-        -- 'НЕТ ПЕРЕЗАРЯДКИ НАВЫКОВ',
+        "УВЕЛИЧИТЬ ДОБАВЛЕННЫЕ АТРИБУТЫ",
         "ИЗМЕНИТЬ СОЗДАННЫЕ ПРЕДМЕТЫ НА СТОЛЕ КУЗНЕЦА",
         "УСТАНОВИТЬ ЦЕНУ ТОВАРОВ У ПРОДАВЦА",
         "РАЗБЛОКИРОВАТЬ ВСЕ САДОВЫЕ УЧАСТКИ",
@@ -33,7 +33,7 @@ lang = {
         "REMOVE MATERIALS FROM THE DESIGNER'S TABLE",
         'UNLOCK ALL WEAPON IN THE BLACKSMITH TABLE',
         'ADD ALL BUFFS',
-        -- 'NO SKILL CD',
+        "INCREASE ADDED ATTRIBUTES",
         "CHANGE THE CREATED ITEMS ON THE BLACKSMITH'S TABLE",
         'SET THE PRICE OF ITEMS FROM THE MERCHANT',
         "UNLOCK ALL GARDEN PLOTS",
@@ -754,7 +754,7 @@ end
 
 function Dictionary:GetAllItemIntInt(dic)
     local link, num, tab = self:GetLink(dic), self:GetNumItem(dic), {}
-    if (not (num < 1) and num < 200) then
+    if (not (num < 1) and num < 200 and link ~= 0) then
         for i = 1, num do
             local tmp = gg.getValues({
                 {
@@ -789,6 +789,27 @@ function Dictionary:SetItemIntInt(dic, key, val)
                 }})
             end
         end
+    end
+end
+
+function Dictionary:SetItemsIntIntTable(dic, tab)
+    local numItem = self:GetNumItem(dic)
+    local linkmass, resultTable = self:GetLink(dic), {}
+    if numItem > 0 and numItem < 1000 then
+        for i = 1, numItem do
+            local k = gg.getValues({{
+                address = linkmass + self['int']['int'].firstStep + self['int']['int'].skip + (self['int']['int'].size * (i - 1)) + self['int']['int'].key,
+                flags = gg.TYPE_DWORD
+            }})[1].value
+            if (tab[k]) then
+                resultTable[#resultTable + 1] = {
+                    address = linkmass + self['int']['int'].firstStep + self['int']['int'].skip + (self['int']['int'].size * (i - 1)) + self['int']['int'].value,
+                    flags = gg.TYPE_DWORD,
+                    value = tab[k]
+                }
+            end
+        end
+        if (#resultTable > 0) then gg.setValues(resultTable) end
     end
 end
 
@@ -1518,20 +1539,28 @@ BattleData = SetUnityClass({
             if (list ~= 0) then List['int']:EditList(list, emBuff, true) end
         end
     end,
-    NoSkillCd = function(self)
-        for k, v in ipairs(self:GetLocalInstance()) do
-            local dic = gg.getValues({{address = v.value + self.attributeAddition, flags = v.flags}})[1].value
-            if (dic ~= 0) then  
-                local has, mass = Dictionary:HasKey(dic, 9)
-                if has then 
-                    Dictionary:SetItemIntInt(dic, 9, 1)
-                else
-                    mass[9] = 1
-                    Dictionary:CreateDictionary(dic, mass, 'int', 'int')
+    IncreaseAttribute = function(self)
+        for k,v in ipairs(self:GetLocalInstance()) do
+            local dic = gg.getValues({{address = v.value + self.Fields.attributeAddition, flags = v.flags}})[1].value
+            local Attribute, fun1, fun2 = Dictionary:GetAllItemIntInt(dic), function() return 100 end, function () return 1 end
+            if (#Attribute > 0) then
+                for key, value in pairs(Attribute) do
+                    Attribute[key] = switch(key, {
+                        [0] = fun1,
+                        [1] = fun1,
+                        [2] = fun1,
+                        [3] = fun1,
+                        [4] = fun1,
+                        [5] = fun1,
+                        [6] = fun1,
+                        [9] = fun2,
+                        [10] = fun1,
+                    })
                 end
+                Dictionary:SetItemsIntIntTable(dic, Attribute)
             end
         end
-    end
+    end,
 })
 
 ItemDrinkSeller = SetUnityClass({
@@ -1728,9 +1757,11 @@ functions = {
     end,
     ['ADD ALL BUFFS'] = function()
         Protect:Call(BattleData.GetAllBuffs, BattleData)
+        gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
     end,
-    ['NO SKILL CD'] = function()
-        Protect:Call(BattleData.NoSkillCd, BattleData)
+    ['INCREASE ADDED ATTRIBUTES'] = function()
+        Protect:Call(BattleData.IncreaseAttribute, BattleData)
+        gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
     end
 }
 
