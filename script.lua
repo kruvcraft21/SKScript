@@ -129,7 +129,7 @@ for s in string.gmatch("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_/01
     Utf16[char[1] + (char[2] * 256)] = s
 end
 
-function switch(check,table,e)
+function switch(check, table, e, ...)
     return ({
         xpcall(
             table[check],
@@ -140,7 +140,8 @@ function switch(check,table,e)
                         return e()
                     end
                 )()
-            end
+            end,
+            ...
         )
     })[2]
 end
@@ -490,12 +491,6 @@ Unity = {
         end
     end,
 }
-
-function Unity:SetPrice(price)
-    for k,v in ipairs(self:GetInstance()) do
-        gg.setValues({{address = v.address + self.GetPrice(),flags = gg.TYPE_DWORD,value = price}})
-    end
-end
 
 function SetUnityClass(t)
     t.ClassLoad = false
@@ -935,13 +930,19 @@ function Dictionary:SetItemStringInt(dic, key, val)
 end
 
 SkillInfo = SetUnityClass({
-    cd = platform and 0x50 or 0x34,
-    price = platform and 0x54 or 0x38,
-    GetPrice = function()
-        return SkillInfo.price
-    end,
     GetTableForCd = function(self, add)
-        return {address = add + self.cd, flags = gg.TYPE_FLOAT, value = 0.01}
+        return {address = add + self.Fields.cd, flags = gg.TYPE_FLOAT, value = 0.01}
+    end,
+    SetPrice = function(self, price)
+        local skills = {}
+        for k, v in ipairs(self:GetInstance()) do
+            skills[#skills + 1] = {
+                address = v.address + self.Fields.price,
+                value = price,
+                flags = gg.TYPE_DWORD
+            }
+        end
+        gg.setValues(skills)
     end
 })
 
@@ -1225,8 +1226,6 @@ RGItem = {
 
 ItemSellPlaceGem = SetUnityClass({
     saveItems = {},
-    unlockByTv = platform and 0xc8 or 0x70,
-    the_item = platform and 0xd8 or 0x78,
     SetPrice = function(self,num)
         for k,v in ipairs(self:GetInstance()) do
             local unlockByTv = gg.getValues({{address = v.address + self.Fields.unlockByTv,flags = gg.TYPE_BYTE}})[1].value
@@ -1311,20 +1310,8 @@ Rigidbody2D = {
     end
 }
 
-RoleAttributeProxy = {
-    Client = platform and 0x10 or 0x8,
-    GetClient = function(self)
-        return gg.getValues({{address = RGController:GetRoleAttribute() + self.Client,flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value
-    end
-}
-
 RGController = { --!!!
-    roleAttributeProxy = platform and 0xE0 or 0x84,
     rigibody = platform and 0x28 or 0x18,
-    GetRoleAttribute = function (self)
-        local instance = RGGameSceneManager:GetController()
-        return gg.getValues({{address = instance + self.roleAttributeProxy,flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value
-    end,
     GetRigidbody2D = function (self)
         local instance = RGGameSceneManager:GetController()
         local RB = gg.getValues({{address = instance + self.rigibody,flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value
@@ -1333,7 +1320,7 @@ RGController = { --!!!
     NoSkillCd = function(self)
         local instance, skills = RGGameSceneManager:GetController(), {}
         for k,v in ipairs(Massiv:GetAllElement(gg.getValues({{address = instance + 0x170, flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value, 'link')) do
-            skills[#skills + 1] = SkillInfo:GetTableForCd(v.value)
+            skills[#skills + 1] = SkillInfo:From(v.value):GetTableForCd()
         end
         gg.setValues(skills)
     end
@@ -1344,135 +1331,6 @@ RGGameSceneManager = SetUnityClass({
         for k,v in ipairs(self:GetLocalInstance()) do
             return gg.getValues({{address = v.value + self.Fields.controller,flags = v.flags}})[1].value
         end
-    end
-})
-
-IntNumberStats = {
-    OriginValue = platform and 0x10 or 0x8
-}
-
-RoleAttributePlayer = SetUnityClass({--!!!
-    _max_armor = platform and 0x58 or 0x3C,
-    armor = platform and 0x5C or 0x40,
-    max_energy = platform and 0x60 or 0x48,
-    _energy = platform and 0x64 or 0x4C,
-    max_hp = platform and 0x24 or 0x18,
-    hp = platform and 0x28 or 0x1C,
-    --MaxArmor = platform and 0x58 or 0x44,
-    AddState = function(self,max_hp,_max_armor,max_energy,delta_hp,delta_armor,delta_energy)
-        for k,v in ipairs(self:GetInstance()) do
-            local CheckHp,CheckArmor,CheckEnergy = table.unpack(gg.getValues({
-                {
-                    address = v.address + self.max_hp,
-                    flags = gg.TYPE_DWORD
-                },
-                {
-                    address = v.address + self._max_armor,
-                    flags = gg.TYPE_DWORD
-                },
-                {
-                    address = v.address + self.max_energy,
-                    flags = gg.TYPE_DWORD
-                },
-            }))
-            if CheckHp.value == max_hp and CheckArmor.value == _max_armor and CheckEnergy.value == max_energy then
-                local MaxArmor = gg.getValues({{address = v.address + self.MaxArmor,flags = v.flags}})[1].value
-                local OriginValue = gg.getValues({{address = MaxArmor + IntNumberStats.OriginValue,flags = gg.TYPE_DWORD}})[1].value
-                gg.setValues({
-                    {
-                        address = v.address + self.max_hp,
-                        flags = gg.TYPE_DWORD,
-                        value = max_hp + delta_hp
-                    },
-                    {
-                        address = v.address + self.hp,
-                        flags = gg.TYPE_DWORD,
-                        value = max_hp + delta_hp
-                    },
-                    {
-                        address = v.address + self._max_armor,
-                        flags = gg.TYPE_DWORD,
-                        value = _max_armor + delta_armor
-                    },
-                    {
-                        address = MaxArmor + IntNumberStats.OriginValue,
-                        flags = gg.TYPE_DWORD,
-                        value = OriginValue + delta_armor
-                    },
-                    {
-                        address = v.address + self.armor,
-                        flags = gg.TYPE_DWORD,
-                        value = _max_armor + delta_armor
-                    },
-                    {
-                        address = v.address + self.max_energy,
-                        flags = gg.TYPE_DWORD,
-                        value = max_energy + delta_energy
-                    },
-                    {
-                        address = v.address + self._energy,
-                        flags = gg.TYPE_DWORD,
-                        value = max_energy + delta_energy
-                    }
-                })
-            end
-        end
-    end,
-    AddStates = function (self,delta_hp,delta_armor,delta_energy)
-        local instance = RoleAttributeProxy:GetClient()
-        --local MaxArmor = gg.getValues({{address = instance + self.MaxArmor,flags = platform and gg.TYPE_QWORD or gg.TYPE_DWORD}})[1].value
-        --local OriginValue = gg.getValues({{address = MaxArmor + IntNumberStats.OriginValue,flags = gg.TYPE_DWORD}})[1].value
-        local MaxHp,MaxDef,MaxEnergy = table.unpack(gg.getValues({
-            {
-                address = instance + self.max_hp,
-                flags = gg.TYPE_DWORD
-            },
-            {
-                address = instance + self._max_armor,
-                flags = gg.TYPE_DWORD
-            },
-            {
-                address = instance + self.max_energy,
-                flags = gg.TYPE_DWORD
-            },
-        }))
-        gg.setValues({
-            {
-                address = instance + self.max_hp,
-                flags = gg.TYPE_DWORD,
-                value = MaxHp.value + delta_hp
-            },
-            {
-                address = instance + self.hp,
-                flags = gg.TYPE_DWORD,
-                value = MaxHp.value + delta_hp
-            },
-            {
-                address = instance + self._max_armor,
-                flags = gg.TYPE_DWORD,
-                value = MaxDef.value + delta_armor
-            },
-            --[[{
-                address = MaxArmor + IntNumberStats.OriginValue,
-                flags = gg.TYPE_DWORD,
-                value = OriginValue + delta_armor
-            },]]
-            {
-                address = instance + self.armor,
-                flags = gg.TYPE_DWORD,
-                value = MaxDef.value + delta_armor
-            },
-            {
-                address = instance + self.max_energy,
-                flags = gg.TYPE_DWORD,
-                value = MaxEnergy.value + delta_energy
-            },
-            {
-                address = instance + self._energy,
-                flags = gg.TYPE_DWORD,
-                value = MaxEnergy.value + delta_energy
-            }
-        })
     end
 })
 
@@ -1542,7 +1400,7 @@ BattleData = SetUnityClass({
     IncreaseAttribute = function(self)
         for k,v in ipairs(self:GetLocalInstance()) do
             local dic = gg.getValues({{address = v.value + self.Fields.attributeAddition, flags = v.flags}})[1].value
-            local Attribute, fun1, fun2 = Dictionary:GetAllItemIntInt(dic), function() return 100 end, function () return 1 end
+            local Attribute, fun1, fun2 = Dictionary:GetAllItemIntInt(dic), function(value) return value + 100 end, function () return 1 end
             if (#Attribute > 0) then
                 for key, value in pairs(Attribute) do
                     Attribute[key] = switch(key, {
@@ -1555,7 +1413,7 @@ BattleData = SetUnityClass({
                         [6] = fun1,
                         [9] = fun2,
                         [10] = fun1,
-                    })
+                    }, nil, value)
                 end
                 Dictionary:SetItemsIntIntTable(dic, Attribute)
             end
@@ -1679,51 +1537,6 @@ functions = {
         Protect:Call(PlantInfo.GrowAllSeeds, PlantInfo)
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
     end,
-    MaxHp = 0,
-    MaxArmor = 0,
-    MaxEnergy = 0,
-    DeltaHp = 0,
-    DeltaEnergy = 0,
-    DeltaArmor = 0,
-    ['ADDSTATEVER1'] = function()
-        local state = gg.prompt({
-            'ВВЕДИТЕ МАКСИМАЛЬНОЕ КОЛИЧЕСТВО ЗДОРОВЬЯ\nENTER THE MAXIMUM AMOUNT OF HEALTH',
-            'ВВЕДИТЕ МАКСИМАЛЬНОЕ КОЛИЧЕСТВО БРОНИ\nENTER THE MAXIMUM AMOUNT OF ARMOR',
-            'ВВЕДИТЕ МАКСИМАЛЬНОЕ КОЛИЧЕСТВО ЭНЕРГИИ\nENTER THE MAXIMUM AMOUNT OF ENERGY',
-            'ВВЕДИТЕ СКОЛЬКО ДОБАВИТЬ ЗДОРОВЬЯ\nENTER HOW MUCH HEALTH TO ADD',
-            'ВВЕДИТЕ СКОЛЬКО ДОБАВИТЬ БРОНИ\nENTER HOW MUCH ARMOR TO ADD',
-            'ВВЕДИТЕ СКОЛЬКО ДОБАВИТЬ ЭНЕРГИИ\nENTER HOW MUCH ENERGY TO ADD',
-        },
-        {
-            functions.MaxHp,functions.MaxArmor,functions.MaxEnergy,functions.DeltaHp,functions.DeltaArmor,functions.DeltaEnergy
-        },
-        {'number','number','number','number','number','number'}
-        )
-        if CheckTableIsNil(state) then
-            gg.alert("ВЫ НЕ ВВЕЛИ ВСЕ ДАННЫЕ\nYOU DIDN'T ENTER ALL THE DATA")
-        else
-            functions.MaxHp,functions.MaxArmor,functions.MaxEnergy,functions.DeltaHp,functions.DeltaArmor,functions.DeltaEnergy = state[1],state[2],state[3],state[4],state[5],state[6]
-            RoleAttributePlayer:AddState(state[1],state[2],state[3],state[4],state[5],state[6])
-        end
-    end,
-    ['ADD HEALTH, ARMOR, ENERGY'] = function ()
-        gg.alert('ВРЕМЕННО НЕ РАБОТАЕТ\nTEMPORARILY NOT WORKING')
-        -- local state = gg.prompt({
-        --     'ВВЕДИТЕ СКОЛЬКО ДОБАВИТЬ ЗДОРОВЬЯ\nENTER HOW MUCH HEALTH TO ADD',
-        --     'ВВЕДИТЕ СКОЛЬКО ДОБАВИТЬ БРОНИ\nENTER HOW MUCH ARMOR TO ADD',
-        --     'ВВЕДИТЕ СКОЛЬКО ДОБАВИТЬ ЭНЕРГИИ\nENTER HOW MUCH ENERGY TO ADD',
-        -- },
-        -- {
-        --     functions.DeltaHp,functions.DeltaArmor,functions.DeltaEnergy
-        -- },
-        -- {'number','number','number'})
-        -- if CheckTableIsNil(state) then
-        --     gg.alert("ВЫ НЕ ВВЕЛИ ВСЕ ДАННЫЕ\nYOU DIDN'T ENTER ALL THE DATA")
-        -- else
-        --     functions.DeltaHp,functions.DeltaArmor,functions.DeltaEnergy = state[1],state[2],state[3]
-        --     RoleAttributePlayer:AddStates(state[1],state[2],state[3])
-        -- end
-    end,
     ['HUGE DAMAGE'] = function()
         Protect:Call(RGWeapon.EditFrontWeapon, RGWeapon)
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
@@ -1773,53 +1586,3 @@ while true do
     end
     gg.sleep(100)
 end
-
---[[
-
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⣀⣀⣀⠄⠄⠄⠄⡀⠄⠄⡀⠠⣤⣄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠈⠉⢉⡏⠄⠄⠄⢸⡇⠄⣼⠇⠄⢀⡏⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⣸⣧⡤⣤⡀⠈⠓⠚⣿⠄⠄⣸⠳⠶⢶⡀⠄⠄
-⠄⠄⠄⠄⣀⡀⠄⠄⠄⠄⠄⠄⣿⠁⠄⣸⡇⣀⣠⡴⠟⠄⠄⣿⣀⣀⣼⠇⠄⠄
-⠄⣠⣶⣿⣿⣿⣿⠆⠄⠄⠄⠄⠻⠦⠶⠋⠄⠉⠄⠄⠄⠄⠄⠉⠉⠉⠁⠄⠄⠄
-⢰⣿⣿⡿⠛⠉⠉⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⢸⣿⣿⡇⠄⠄⠄⠄⠄⠄⠄⠄⠄⢀⣀⣠⣤⣀⣀⠄⠄⠄⠄⢀⣀⣀⣀⡀⠄⠄
-⠄⢿⣿⣧⠄⠄⠄⠄⠄⠄⢀⣴⣿⣿⣿⣿⣿⣿⣿⣷⣄⠄⣼⣿⣿⣿⣿⣿⣦⠄
-⠄⠘⣿⣿⣧⡀⠄⠄⠄⢠⣾⣿⣿⣿⣿⣿⣿⣿⢿⣿⣿⡀⠹⠿⠛⠉⢹⣿⣿⡄
-⠄⠄⠈⢿⣿⣿⣄⠄⢠⣿⣿⣿⣇⣍⢹⣿⣯⣰⣼⣿⡿⠁⠄⠄⠄⢀⣾⣿⣿⠃
-⠄⠄⠄⠈⢿⣿⣿⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠁⠄⠄⢀⣴⣾⣿⡿⠃⠄
-⠄⠄⠄⠄⠈⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣦⣤⣶⣿⣿⣿⠟⠋⠄⠄⠄
-⠄⠄⠄⠄⠄⠈⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠟⠉⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⢻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠁⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⢸⣿⣿⣿⣿⠋⠉⠉⠉⠘⣿⣿⣿⣿⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⢸⣿⣿⣿⡏⠄⠄⠄⠄⠄⢹⣿⣿⣿⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⢸⣿⣿⣿⡇⠄⠄⠄⠄⠄⠸⣿⣿⣿⡄⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⣿⣿⣿⣿⠄⠄⠄⠄⠄⠄⠄⣿⣿⣿⣷⠄⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⣿⣿⣿⡇⠄⠄⠄⠄⠄⠄⠄⢸⣿⣿⣿⡆⠄⠄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⢰⣿⣿⣿⣄⠄⠄⠄⠄⠄⠄⠄⠈⣿⣿⣿⣿⣶⡄⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠈⠻⣿⣿⡟⠄⠄⠄⠄⠄⠄⠄⠄⢿⣿⣿⣿⠿⠃⠄⠄⠄⠄⠄⠄
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
-
-.
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⣀⣀⣀⣠⣤⣤⣄⣀⣀⣀⡀
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⣀⠤⠖⠊⠉⠁⠄⠄⠄⠄⠄⠄⠄⠄⠈⠉⠙⠲⢤⡀
-⠄⠄⠄⠄⠄⠄⠄⡤⠊⠁⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠈⢦⡀
-⠄⠄⠄⠄⠄⠄⡜⠄⠄⠄⠄⠄⠄⢀⡀⠄⠄⠄⠄⠄⠄⠄⠄⠄⢢⠄⠄⠄⠄⠄⢳
-⠄⠄⠄⠄⠄⣸⠁⠄⠄⠄⠄⠄⠄⠄⠱⡀⠄⠄⠄⠄⠄⠄⠄⡀⠈⠄⡀⠄⠄⠄⠈⡇
-⠄⠄⠄⠄⠄⡏⠄⠄⠄⠄⠄⠄⠄⠄⡰⠁⠄⠄⠄⠄⠄⠄⠄⠘⡆⡜⠁⠄⠄⠄⠄⢧⡀
-⠄⠄⠄⠄⠄⡇⠄⠄⠄⠄⠄⠄⠄⠸⡀⠄⠄⠄⠄⠄⣀⣤⡂⠄⠇⠱⠄⡀⠄⠄⠄⠄⡇
-⠄⠄⠄⠄⠄⢇⠄⠄⠄⠄⠄⠄⠄⠄⠈⢄⡀⢠⣟⢭⣥⣤⠽⡆⠄⡶⣊⣉⣲⣤⢀⡞
-⠄⠄⠄⠄⠄⠘⣆⠄⠄⠄⠄⠄⠄⡀⠄⠐⠂⠘⠄⣈⣙⡡⡴⠄⠄⠙⣄⠙⣛⠜⠘⣆
-⠄⠄⠄⠄⠄⠄⠈⢦⡀⠄⠄⠄⢸⠁⠄⠄⠄⠄⠄⠄⠄⠊⠄⠄⠄⠄⡸⠛⠄⠄⠄⢸
-⠄⠄⠄⠄⠄⠄⠄⠄⠈⠓⠦⢄⣘⣄⠄⠄⠄⠄⠄⠄⠄⡠⠄⠄⠄⠄⣇⡀⠄⠄⣠⠎
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⣸⠁⠈⡟⠒⠲⣄⠄⠄⡰⠇⠖⢄⠄⠄⡹⡇⢀⠎
-⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⢀⡇⠄⠄⡇⠄⠄⠹⠄⡞⠄⠄⢀⠤⣍⠭⡀⢱⢸
-⠄⠄⠄⠄⠄⠄⢀⣀⣀⣠⠞⠄⠄⢠⡇⠄⠄⠄⠄⠁⠄⢴⠥⠤⠦⠦⡼⠄⢸
-⣀⣤⣴⣶⣿⣿⡟⠁⠄⠋⠄⠄⠄⢸⠁⠄⠄⠄⠄⠄⠄⠄⠑⣠⢤⠐⠁⠄⢸
-⣿⣿⣿⣿⣿⡟⠄⠄⠄⠄⠄⠄⠄⢸⡀⠄⠄⠄⠄⠄⠄⠄⠄⠬⠥⣄⠄⠄⠈⠲⡄
-⣿⣿⣿⣿⣿⡇⠄⠄⠄⠄⠄⠄⠄⠄⠙⠦⣄⠄⠄⠄⠄⠄⠄⠄⠄⠈⢳⠄⠄⢀⣿⡀
-⣿⣿⣿⣿⣿⣧⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠈⠙⠒⠦⠤⢤⣄⣀⣠⠤⢿⣶⣶⣿⣿⣿⣶⣤⡀
-⣿⣿⣿⣿⣿⣿⣷⣄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⢀⡼⠁⠄⠄⣠⣾⣿⣿⣿⣿⣿⣿⣿⣿⣄
-⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣦⣤⣤⣀⣀⣀⣀⣀⣀⣀⣤⣤⣤⣶⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿
-
-]]
