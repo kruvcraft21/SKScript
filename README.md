@@ -1,7 +1,7 @@
 # SCRIPT FOR SOUL KNIGHT 
 
 ## ОПИСАНИЕ НА РУССКОМ
-Данный скрипт только для игры Soul knight. Работает данный скрипт через программу [GameGuardian](https://gameguardian.net).
+Данный скрипт только для игры Soul knight. Работает данный скрипт через программу [GameGuardian](https://gameguardian.net). Данный скрипт создан лишь для расширения игрового процесса и для помощи тем людям, которые не могут пройти тот или иной участок игры по определённым причинам.
 
 <details><summary>Возможности скрипта</summary>
 
@@ -41,7 +41,7 @@
 
 
 ## DESCRIPTION IN ENGLISH
-This script is only for Soul knight. This script works via [GameGuardian](https://gameguardian.net).
+This script is only for Soul knight. This script works via [GameGuardian](https://gameguardian.net). This script was created only to expand the gameplay and to help those people who cannot pass this or that part of the game for certain reasons.
 
 
 <details><summary>Script Features</summary>
