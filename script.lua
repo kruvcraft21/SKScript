@@ -312,6 +312,19 @@ function DataCheck(address)
     return (fixvalue32(address) > fixvalue32(data[1].start) and fixvalue32(address) < fixvalue32(data[1]['end']))
 end
 
+function PatchByteCodes(add, Bytescodes)
+    local patch = {}
+    for code in string.gmatch(Bytescodes, '.') do
+        patch[#patch + 1] = {
+            address = add,
+            value = string.byte(code),
+            flags = gg.TYPE_BYTE
+        }       
+        add = add + 1
+    end
+    gg.setValues(patch)
+end
+
 Unity = {
     ClassNameOffset = platform and 0x10 or 0x8,
     StaticFieldsOffset = platform and 0xB8 or 0x5C,
@@ -416,7 +429,7 @@ Unity = {
         local num = gg.getValues({{address = strAddress,flags = gg.TYPE_DWORD}})[1].value
         if num > 0 and num < 200 then
             for i = 1, num + 1 do
-                bytes[#bytes + 1] = {address = strAddress + (i * 0x2), flags = gg.TYPE_WORD}
+                bytes[#bytes + 1] = {address = strAddress + (i << 1), flags = gg.TYPE_WORD}
             end
         end
         return #bytes > 0 and tostring(setmetatable(gg.getValues(bytes), {
@@ -1273,7 +1286,7 @@ VacantWallListener = SetUnityClass({
     RemoveVacWall = function (self)
         for k,v in ipairs(self.GetIl2cppFunc('OnTriggerEnter2D')) do
             if (not v.Error) and v.Class == GetNameTableInGlobalSpace(self) then
-                addresspath(tonumber(v.AddressInMemory,16),platform and "\xc0\x03\x5f\xd6" or "\x1e\xff\x2f\xe1")
+                PatchByteCodes(tonumber(v.AddressInMemory,16), platform and "\xc0\x03\x5f\xd6" or "\x1e\xff\x2f\xe1")
             end
         end
         self.IsRun = true
