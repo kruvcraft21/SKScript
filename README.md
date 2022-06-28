@@ -37,6 +37,7 @@
 21. Может зарядить волновод (Функция: ЗАРЯДИТЬ ВОЛНОВОД)
 22. Может добавить все возможные бафы (Функция: ДОБАВИТЬ ВСЕ БАФЫ)
 23. Может увеличить уже имеющиеся атрибуты (Это всё то, что дают напитки) (Функция: УВЕЛИЧИТЬ ДОБАВЛЕННЫЕ АТРИБУТЫ)
+24. Может убрать откат у любого скилла (Функция: НЕТ ПЕРЕЗАРЯДКИ НАВЫКОВ)
 </details>
 
 
@@ -79,4 +80,5 @@ This script is only for Soul knight. This script works via [GameGuardian](https:
 21. Can charge the waveguide (Function: CHARGE THE WAVEGUIDE)
 22. Can add all possible buffs (Function: ADD ALL BUFFS)
 23. Can increase already existing attributes (This is all that drinks give) (Function: INCREASE ADDED ATTRIBUTES)
+24. Can remove the rollback from any skill (Function: NO SKILL COOLDOWN)
 </details>

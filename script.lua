@@ -16,6 +16,7 @@ lang = {
         'ОГРОМНЫЙ УРОН',
         'УБРАТЬ КОЛИЧЕСТВО ПОКУПОК У ПРОДАВЦА',
         'ЗАРЯДИТЬ ВОЛНОВОД',
+        "НЕТ ПЕРЕЗАРЯДКИ НАВЫКОВ",
         "УБРАТЬ КОЛИЧЕСТВО ПОПЫТОК BOSS RUSH",
         "УСТАНОВИТЬ КОЛИЧЕСТВО СЕМЯН",
         "УСТАНОВИТЬ КОЛИЧЕСТВО МАТЕРИАЛОВ",
@@ -43,6 +44,7 @@ lang = {
         'HUGE DAMAGE',
         'RESET SELLER',
         'CHARGE THE WAVEGUIDE',
+        "NO SKILL COOLDOWN",
         "REMOVE THE NUMBER OF BOSS RUSH ATTEMPTS",
         'SET COUNT SEEDS',
         'SET MATERIALS COUNT',
@@ -1447,6 +1449,16 @@ ItemDrinkSeller = SetUnityClass({
     end
 })
 
+RoleAttributeProxy = SetUnityClass({
+    NoSkillCooldown = function(self)
+        for k,v in ipairs(self.GetIl2cppFunc('get_skill_ready')) do
+            if (not v.Error) and v.Class == GetNameTableInGlobalSpace(self) then
+                PatchByteCodes(tonumber(v.AddressInMemory,16), platform and "\x20\x00\x80\x52\xc0\x03\x5f\xd6" or "\x01\x00\xa0\xe3\x1e\xff\x2f\xe1")
+            end
+        end
+    end
+})
+
 functions = {
     ['EXIT'] = function()
         if not pcall(dropboxfile,"MainMenu.lua") then os.exit() end
@@ -1587,6 +1599,10 @@ functions = {
     end,
     ['INCREASE ADDED ATTRIBUTES'] = function()
         Protect:Call(BattleData.IncreaseAttribute, BattleData)
+        gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
+    end,
+    ['NO SKILL COOLDOWN'] = function()
+        Protect:Call(RoleAttributeProxy.NoSkillCooldown, RoleAttributeProxy)
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
     end
 }
