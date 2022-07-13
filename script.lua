@@ -177,16 +177,16 @@ function GetInfoFropApps()
     local data = gg.getRangesList('global-metadata.dat') 
     local il2cpp = gg.getRangesList('libil2cpp.so')
     local info = gg.getTargetInfo()
-    if info then return info.x64, data end
+    if info then return data, il2cpp, info.x64, info.targetSdkVersion end
     if #il2cpp ~= 0 then
         local check = string.gsub(il2cpp[1].internalName,'%/.-%/lib/','')
         check = switch(check,{
             ['arm64/libil2cpp.so'] = true,
             ['arm/libil2cpp.so'] = false
         })
-        if check ~= nil then return data, check, il2cpp end
+        if check ~= nil then return data, il2cpp, check, info.targetSdkVersion end
     end
-    return nil, nil, nil
+    return nil, nil, nil, nil
 end
 
 function GetAppData()
@@ -196,10 +196,10 @@ function GetAppData()
         if info == 2 then gg.copyText('http://crusher.ucoz.net/index/manual/0-6') end
         return GetInfoFropApps()
     end
-    return gg.getRangesList('global-metadata.dat'), info.x64, gg.getRangesList('libil2cpp.so')
+    return gg.getRangesList('global-metadata.dat'), gg.getRangesList('libil2cpp.so'), info.x64, info.targetSdkVersion
 end
 
-data, platform, libil = GetAppData()
+data, libil, platform, sdk = GetAppData()
 
 if #libil == 0 then
     local splitconf = gg.getRangesList('split_config.')
@@ -367,9 +367,16 @@ Unity = {
         gg.clearResults()
         gg.loadResults(Instances)
         gg.searchPointer(0)
+        if gg.getResultsCount() <= 0 and platform and sdk >= 30 then
+            for k,v in ipairs(Instances) do
+                v.address = v.address | 0xB400000000000000
+            end
+            gg.loadResults(Instances)
+            gg.searchPointer(0)
+        end
         local r, FilterInstances = gg.getResults(gg.getResultsCount()), {}
         for k,v in ipairs(gg.getValuesRange(r)) do
-            FilterInstances[#FilterInstances + 1] = v == 'A' and {address = r[k].value, flags = r[k].flags} or nil
+            FilterInstances[#FilterInstances + 1] = v == 'A' and {address = fixvalue32(r[k].value) & 0x00FFFFFFFFFFFFFF, flags = r[k].flags} or nil
         end
         gg.clearResults()
         gg.loadResults(FilterInstances)
@@ -382,6 +389,11 @@ Unity = {
         local MemClass = self:GetClass(ClassName)
         gg.loadResults({MemClass})
         gg.searchPointer(self.ClassNameOffset)
+        if gg.getResultsCount() <= 0 and platform and sdk >= 30 then
+            MemClass.address = MemClass.address | 0xB400000000000000
+            gg.loadResults({MemClass})
+            gg.searchPointer(self.ClassNameOffset)
+        end
         local r = gg.getResults(gg.getResultsCount())
         for k,v in ipairs(gg.getValuesRange(r)) do
             Instances[#Instances + 1] = v == 'A' and r[k] or nil
@@ -470,7 +482,7 @@ Unity = {
         return RetIl2CppFuncs,'true'
     end,
     From = function (self, a)
-        if not self.ClassLoad then self:SetFields(gg.getValues({{address = fixvalue32(a), flags = Unity.MainType}})[1].value) end
+        if not self.ClassLoad then self:SetFields(gg.getValues({{address = fixvalue32(a) & 0x00FFFFFFFFFFFFFF, flags = Unity.MainType}})[1].value) end
         return setmetatable({address = a, mClass = self}, {
             __index = function(self, key)
                 local check = switch((self.address and self.mClass) and (self.mClass[key] and 1 or -1) or 0 , {[0] = 'Не все поля заполнены', [-1] = 'В таблице нет поля ' .. key})
@@ -519,7 +531,7 @@ end
 
 EnumClass = {
     From = function (self, a)
-        return setmetatable({address = a, mClass = self}, {
+        return setmetatable({address = fixvalue32(a) & 0x00FFFFFFFFFFFFFF, mClass = self}, {
             __index = function(self, key)
                 local check = switch((self.address and self.mClass) and (self.mClass[key] and 1 or -1) or 0 , {[0] = 'Не все поля заполнены', [-1] = 'В таблице нет поля ' .. key})
                 return check and error(check) or ((type(self.mClass[key]) == 'function') 
