@@ -368,11 +368,15 @@ Unity = {
         gg.loadResults(Instances)
         gg.searchPointer(0)
         if gg.getResultsCount() <= 0 and platform and sdk >= 30 then
+            local FixInstances = {}
             for k,v in ipairs(Instances) do
                 v.address = v.address | 0xB400000000000000
+                gg.searchNumber(tostring(v.address | 0xB400000000000000), gg.TYPE_QWORD)
+                local RefToObject = gg.getResults(gg.getResultsCount())
+                RefToObject:move(1, #RefToObject, #FixInstances + 1, FixInstances)
+                gg.clearResults()
             end
-            gg.loadResults(Instances)
-            gg.searchPointer(0)
+            gg.loadResults(FixInstances)
         end
         local r, FilterInstances = gg.getResults(gg.getResultsCount()), {}
         for k,v in ipairs(gg.getValuesRange(r)) do
@@ -390,9 +394,7 @@ Unity = {
         gg.loadResults({MemClass})
         gg.searchPointer(self.ClassNameOffset)
         if gg.getResultsCount() <= 0 and platform and sdk >= 30 then
-            MemClass.address = MemClass.address | 0xB400000000000000
-            gg.loadResults({MemClass})
-            gg.searchPointer(self.ClassNameOffset)
+            gg.searchNumber(tostring(MemClass.address - self.ClassNameOffset | 0xB400000000000000), gg.TYPE_QWORD)
         end
         local r = gg.getResults(gg.getResultsCount())
         for k,v in ipairs(gg.getValuesRange(r)) do
