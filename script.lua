@@ -18,6 +18,7 @@ lang = {
         'ЗАРЯДИТЬ ВОЛНОВОД',
         "НЕТ ПЕРЕЗАРЯДКИ НАВЫКОВ",
         "УБРАТЬ КОЛИЧЕСТВО ПОПЫТОК BOSS RUSH",
+        "ПОЛУЧИТЬ ЗОЛОТЫЕ ТРОФЕИ ЗА СЕЗОНЫ",
         "УСТАНОВИТЬ КОЛИЧЕСТВО СЕМЯН",
         "УСТАНОВИТЬ КОЛИЧЕСТВО МАТЕРИАЛОВ",
         "УСТАНОВИТЬ КОЛИЧЕСТВО КУПОНОВ",
@@ -46,6 +47,7 @@ lang = {
         'CHARGE THE WAVEGUIDE',
         "NO SKILL COOLDOWN",
         "REMOVE THE NUMBER OF BOSS RUSH ATTEMPTS",
+        "GET GOLD TROPHIES FOR THE SEASONS",
         'SET COUNT SEEDS',
         'SET MATERIALS COUNT',
         'SET TOKENS COUNT',
@@ -85,7 +87,9 @@ langClass = {
         ErrorLib = 'Game Guardian не нашёл нужную библиотеку. Скрипт запустится, но будет работать частично некорректно',
         ErrorAlert = 'При выполнении функции произошла ошибка',
         SkinMaterialRelation = 'Чертежи скинов получены',
-        BattleData = 'Боевые данные найдены'
+        BattleData = 'Боевые данные найдены',
+        TroopAchievement = "Достижения первого сезона были найдены",
+        ArtifactsAchievement = "Достижения второго сезона были найдены",
     },
     ['en_US'] = {
         SkillInfo = "Skills found",
@@ -113,7 +117,9 @@ langClass = {
         ErrorLib = "Game Guardian didn't find the right library. The script will run, but it will work partially incorrectly",
         ErrorAlert = 'An error occurred while executing the function',
         SkinMaterialRelation = 'Blueprint of skins have been received',
-        BattleData = 'Battle data found'
+        BattleData = 'Battle data found',
+        TroopAchievement = "Achievements of the first season were found",
+        ArtifactsAchievement = "Achievements of the second season were found",
     },
 }
 
@@ -301,7 +307,7 @@ function GetAddressMemory(startAddress, add)
 end
 
 function fixvalue32(value)
-    return platform and value or value & 0xFFFFFFFF
+    return platform and value & 0x00FFFFFFFFFFFFFF or value & 0xFFFFFFFF
 end
 
 function MyLenTable(t)
@@ -335,6 +341,7 @@ Unity = {
     FieldsLink = platform and 0x80 or 0x40,
     FieldsStep = platform and 0x20 or 0x14,
     FieldsOffset = platform and 0x18 or 0xC, 
+    TypeMetadataHandle = platform and 0x68 or 0x34,
     MethodClassOffset = platform and 0x18 or 0xC, 
     MethodNameOffset = platform and 0x10 or 0x8,
     MainType = platform and gg.TYPE_QWORD or gg.TYPE_DWORD,
@@ -350,11 +357,29 @@ Unity = {
         if (#res > 1) then
             for k,v in ipairs(res) do
                 local assembly = gg.getValues({{address = v.address - Unity.ClassNameOffset,flags = v.flags}})[1].value
-                if (DataCheck(gg.getValues({{address = assembly ,flags = v.flags}})[1].value)) then res[1] = v end
+                if Unity.Utf8ToString(gg.getValues({{address = assembly,flags = v.flags}})[1].value):find(".dll") then res[1] = v end
             end
         end
         if not self.ClassLoad then self:SetFields(res[1].address - Unity.ClassNameOffset) end
         return res[1]
+    end,
+    LoadEnum = function(self)
+        local ClassName = GetNameTableInGlobalSpace(self)
+        gg.clearResults()
+        gg.setRanges(0)
+        gg.setRanges(gg.REGION_C_HEAP | gg.REGION_C_HEAP | gg.REGION_ANONYMOUS | gg.REGION_C_BSS | gg.REGION_C_DATA | gg.REGION_OTHER | gg.REGION_C_ALLOC)
+        gg.searchNumber("Q 00 '" .. ClassName .. "' 00",gg.TYPE_BYTE,false,gg.SIGN_EQUAL,data[1].start,data[1]['end'])
+        gg.searchNumber("Q '" .. ClassName .. "' ")
+        gg.searchPointer(0)
+        local res = gg.getResults(gg.getResultsCount())
+        gg.clearResults()
+        if (#res > 1) then
+            for k,v in ipairs(res) do
+                local assembly = gg.getValues({{address = v.address - Unity.ClassNameOffset,flags = v.flags}})[1].value
+                if Unity.Utf8ToString(gg.getValues({{address = assembly,flags = v.flags}})[1].value):find(".dll") then res[1] = v end
+            end
+        end
+        if not self.ClassLoad then self:SetConstFields(res[1].address - Unity.ClassNameOffset) end
     end,
     GetStartLibAddress = function(Address)
         local start = 0
@@ -380,7 +405,7 @@ Unity = {
         end
         local r, FilterInstances = gg.getResults(gg.getResultsCount()), {}
         for k,v in ipairs(gg.getValuesRange(r)) do
-            FilterInstances[#FilterInstances + 1] = v == 'A' and {address = fixvalue32(r[k].value) & 0x00FFFFFFFFFFFFFF, flags = r[k].flags} or nil
+            FilterInstances[#FilterInstances + 1] = v == 'A' and {address = fixvalue32(r[k].value), flags = r[k].flags} or nil
         end
         gg.clearResults()
         gg.loadResults(FilterInstances)
@@ -483,8 +508,42 @@ Unity = {
         end
         return RetIl2CppFuncs,'true'
     end,
+    GetDefaultValue = function(self, index)
+        local consts = gg.getValues({
+            {
+                address = data[1].start + 0x40,
+                flags = gg.TYPE_DWORD
+            },
+            {
+                address = data[1].start + 0x44,
+                flags = gg.TYPE_DWORD
+            },
+            {
+                address = data[1].start + 0x48,
+                flags = gg.TYPE_DWORD
+            }
+        })
+        gg.clearResults()
+        gg.setRanges(0)
+        gg.setRanges(gg.REGION_C_HEAP | gg.REGION_C_HEAP | gg.REGION_ANONYMOUS | gg.REGION_C_BSS | gg.REGION_C_DATA | gg.REGION_OTHER | gg.REGION_C_ALLOC)
+        gg.searchNumber(
+            tostring(index), 
+            gg.TYPE_DWORD, 
+            false, 
+            gg.SIGN_EQUAL, 
+            data[1].start + consts[1].value, 
+            data[1].start + consts[1].value + consts[2].value
+        )
+        if gg.getResultsCount() > 0 then
+            local Il2CppFieldDefaultValue = gg.getResults(1)
+            gg.clearResults()
+            local dataIndex = gg.getValues({{address = Il2CppFieldDefaultValue[1].address + 8, flags = gg.TYPE_DWORD}})[1].value
+            return gg.getValues({{address = dataIndex + data[1].start + consts[3].value, flags = gg.TYPE_WORD}})[1].value
+        end
+        return nil
+    end,
     From = function (self, a)
-        if not self.ClassLoad then self:SetFields(gg.getValues({{address = fixvalue32(a) & 0x00FFFFFFFFFFFFFF, flags = Unity.MainType}})[1].value) end
+        if not self.ClassLoad then self:SetFields(gg.getValues({{address = fixvalue32(a), flags = Unity.MainType}})[1].value) end
         return setmetatable({address = a, mClass = self}, {
             __index = function(self, key)
                 local check = switch((self.address and self.mClass) and (self.mClass[key] and 1 or -1) or 0 , {[0] = 'Не все поля заполнены', [-1] = 'В таблице нет поля ' .. key})
@@ -519,6 +578,44 @@ Unity = {
             self.Fields[self.Utf8ToString(fixvalue32(fieldInfo[1].value))] = fieldInfo[2].value
         end
     end,
+    SetConstFields = function(self, AddressClass)
+        AddressClass = fixvalue32(AddressClass)
+        self.ClassLoad = true
+        local ClassChar = gg.getValues({
+            {
+                address = AddressClass + self.NumFields,
+                flags = gg.TYPE_WORD
+            },
+            {
+                address = AddressClass + self.FieldsLink,
+                flags = Unity.MainType
+            },
+            {
+                address = AddressClass + self.TypeMetadataHandle,
+                flags = Unity.MainType
+            }
+        })
+        local FieldsLink = fixvalue32(ClassChar[2].value)
+        local fieldStart = gg.getValues({{address = fixvalue32(ClassChar[3].value) + 0x20, flags = gg.TYPE_DWORD}})[1].value
+        for i = 1, ClassChar[1].value do
+            local field = FieldsLink + ((i-1) * self.FieldsStep)
+            local fieldInfo = gg.getValues({
+                {--NameField
+                    address = field,
+                    flags = Unity.MainType
+                },
+                {--Offset
+                    address = field + self.FieldsOffset,
+                    flags = gg.TYPE_WORD
+                },
+            })
+            local fieldIndex = i + fieldStart - 1
+            local offsetField = fieldInfo[2].value
+            self.Fields[self.Utf8ToString(fixvalue32(fieldInfo[1].value))] = offsetField > 0 
+                and nil 
+                or self:GetDefaultValue(i + fieldStart - 1)
+        end
+    end,
 }
 
 function SetUnityClass(t)
@@ -533,7 +630,7 @@ end
 
 EnumClass = {
     From = function (self, a)
-        return setmetatable({address = fixvalue32(a) & 0x00FFFFFFFFFFFFFF, mClass = self}, {
+        return setmetatable({address = fixvalue32(a), mClass = self}, {
             __index = function(self, key)
                 local check = switch((self.address and self.mClass) and (self.mClass[key] and 1 or -1) or 0 , {[0] = 'Не все поля заполнены', [-1] = 'В таблице нет поля ' .. key})
                 return check and error(check) or ((type(self.mClass[key]) == 'function') 
@@ -596,7 +693,7 @@ List['int'] = SetSubClass({
 List['string'] = SetSubClass({    
     subType = 'char',
     mainType = 'link',
-    EditList = function(self, list, newTable, saveOld)
+    EditList = function(self, list, newTable, saveOld, IsNewTableLink)
         local MainTable, MainHead, SubHead, num  = {}, 0, 0, List:GetNumItem(list)
         if num > 0 and num < 200 then
             local link = List:GetLink(list)
@@ -610,9 +707,14 @@ List['string'] = SetSubClass({
         end
         if SubHead ~= 0 then
             MainTable = saveOld and EditTableLink(MainTable) or {}
-            for i = 1, #newTable do
-                local addTable = StringToTable(newTable[i])
-                MainTable[#MainTable + 1] = Massiv:CreateMassiv(list, SubHead, self.subType, addTable)
+            if not IsNewTableLink then
+                for i = 1, #newTable do
+                    local addTable = StringToTable(newTable[i])
+                    MainTable[#MainTable + 1] = Massiv:CreateMassiv(list, SubHead, self.subType, addTable)
+                end
+            else
+                newTable = EditTableLink(newTable)
+                table.move(newTable, 1, #newTable, #MainTable + 1, MainTable)
             end
             self:SetNumItem(list,#MainTable)
             self:SetLink(list,Massiv:CreateMassiv(list,MainHead,self.mainType,MainTable))
@@ -1164,6 +1266,36 @@ WeaponsConfig = SetUnityClass({
     end
 })
 
+TroopAchievement = SetUnityClass({
+    GetAllAchiv = function(self)
+        local achivelink = {}
+        for k, v in ipairs(self:GetLocalInstance()) do
+            local BronzeKeys = Massiv:From(fixvalue32(gg.getValues({{address = v.address + self.Fields.BronzeKeys, flags = v.flags}})[1].value)):GetAllElement('link')
+            local SilverKeys = Massiv:From(fixvalue32(gg.getValues({{address = v.address + self.Fields.SilverKeys, flags = v.flags}})[1].value)):GetAllElement('link')
+            local GoldKeys = Massiv:From(fixvalue32(gg.getValues({{address = v.address + self.Fields.GoldKeys, flags = v.flags}})[1].value)):GetAllElement('link')
+            table.move(BronzeKeys, 1, #BronzeKeys, #achivelink + 1, achivelink)
+            table.move(SilverKeys, 1, #SilverKeys, #achivelink + 1, achivelink)
+            table.move(GoldKeys, 1, #GoldKeys, #achivelink + 1, achivelink)
+        end
+        return achivelink
+    end
+})
+
+ArtifactsAchievement = SetUnityClass({
+    GetAllAchiv = function(self)
+        local achivelink = {}
+        for k, v in ipairs(self:GetLocalInstance()) do
+            local copper_achievements = Massiv:From(fixvalue32(gg.getValues({{address = v.address + self.Fields.copper_achievements, flags = v.flags}})[1].value)):GetAllElement('link')
+            local silver_achievements = Massiv:From(fixvalue32(gg.getValues({{address = v.address + self.Fields.silver_achievements, flags = v.flags}})[1].value)):GetAllElement('link')
+            local gold_achievements = Massiv:From(fixvalue32(gg.getValues({{address = v.address + self.Fields.gold_achievements, flags = v.flags}})[1].value)):GetAllElement('link')
+            table.move(copper_achievements, 1, #copper_achievements, #achivelink + 1, achivelink)
+            table.move(silver_achievements, 1, #silver_achievements, #achivelink + 1, achivelink)
+            table.move(gold_achievements, 1, #gold_achievements, #achivelink + 1, achivelink)
+        end
+        return achivelink
+    end
+})
+
 StatisticData = SetUnityClass({
     object2ObtainTime = platform and 0x20 or 0x10,
     event2Count = platform and 0x28 or 0x14,
@@ -1175,6 +1307,15 @@ StatisticData = SetUnityClass({
     SetPower = function(self)
         for k,v in ipairs(self:GetInstance()) do
             Dictionary:From(gg.getValues({{address = v.address + self.Fields.event2Count, flags = v.flags}})[1].value):SetItemStringInt('hero_char_useable_value', 100)
+        end
+    end,
+    GetPrizeSeason = function(self)
+        local troopAchive = TroopAchievement:GetAllAchiv()
+        local ArtifactsAchiv = ArtifactsAchievement:GetAllAchiv()
+        for k, v in ipairs(self:GetInstance()) do
+            local recordedEvents = List["string"]:From(gg.getValues({{address = v.address + self.Fields.recordedEvents, flags = v.flags}})[1].value)
+            recordedEvents:EditList(troopAchive, true, true)
+            recordedEvents:EditList(ArtifactsAchiv, true, true)
         end
     end
 })
@@ -1416,14 +1557,25 @@ RGSaveManager = SetUnityClass({
     end,
 })
 
-emBuff = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,1000,1001,1003,1004,1005,1006,1007,1008,1009}
+-- emBuff = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,1000,1001,1003,1004,1005,1006,1007,1008,1009}
+
+emBuff = SetUnityClass({})
 
 BattleData = SetUnityClass({
     attributeAddition = platform and 0x150 or 0xD8,
     GetAllBuffs = function(self)
         for k, v in ipairs(self:GetLocalInstance()) do
             local list = gg.getValues({{address = v.value + self.Fields.buffs, flags = v.flags}})[1].value
-            if (list ~= 0) then List['int']:EditList(list, emBuff, true) end
+            if not emBuff.ClassLoad then
+                emBuff:LoadEnum()
+            end
+            local emBuffField = {}
+            for key, value in pairs(emBuff.Fields) do
+                if key ~= "value__" then
+                    table.insert(emBuffField, #emBuffField + 1, value)
+                end
+            end
+            if (list ~= 0) then List['int']:EditList(list, emBuffField, true) end
         end
     end,
     IncreaseAttribute = function(self)
@@ -1617,6 +1769,10 @@ functions = {
     end,
     ['NO SKILL COOLDOWN'] = function()
         Protect:Call(RoleAttributeProxy.NoSkillCooldown, RoleAttributeProxy)
+        gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
+    end,
+    ["GET GOLD TROPHIES FOR THE SEASONS"] = function()
+        Protect:Call(StatisticData.GetPrizeSeason, StatisticData)
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
     end
 }
