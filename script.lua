@@ -1375,6 +1375,11 @@ UIForge = SetUnityClass({
                 gg.setValues(forgableCount)
             end
         end
+        for k,v in ipairs(self.GetIl2cppFunc('IsUnlocked')) do
+            if (not v.Error) and v.Class == GetNameTableInGlobalSpace(self) then
+                PatchByteCodes(tonumber(v.AddressInMemory,16), platform and "\x20\x00\x80\x52\xc0\x03\x5f\xd6" or "\x01\x00\xa0\xe3\x1e\xff\x2f\xe1")
+            end
+        end
     end
 })
 
