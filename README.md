@@ -82,3 +82,13 @@ This script is only for Soul knight. This script works via [GameGuardian](https:
 23. Can increase already existing attributes (This is all that drinks give) (Function: INCREASE ADDED ATTRIBUTES)
 24. Can remove the rollback from any skill (Function: NO SKILL COOLDOWN)
 </details>
+
+## 中文说明
+
+这是一个[GG](https://gameguardian.net)修改器的元气骑士的脚本，
+创建此脚本只是为了扩展游戏玩法并帮助那些由于某些原因无法通过游戏的这个或那个部分的人。
+
+## About author
+
+* [Author](https://github.com/kruvcraft21)
+* Special thanks for the translation into Chinese [qaq1000w](https://github.com/qaq1000w)
