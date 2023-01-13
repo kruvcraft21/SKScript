@@ -362,6 +362,78 @@ function PatchByteCodes(add, Bytescodes)
     gg.setValues(patch)
 end
 
+---@param Address number
+ReadCompressedUInt32 = function(Address)
+    local val, offset = 0, 0
+    local read = gg.getValues(
+                     {
+            { -- [1]
+                address = Address,
+                flags = gg.TYPE_BYTE
+            },
+            { -- [2]
+                address = Address + 1,
+                flags = gg.TYPE_BYTE
+            },
+            { -- [3]
+                address = Address + 2,
+                flags = gg.TYPE_BYTE
+            },
+            { -- [4]
+                address = Address + 3,
+                flags = gg.TYPE_BYTE
+            }
+        })
+    local read1 = read[1].value & 0xFF
+    offset = 1
+    if (read1 & 0x80) == 0 then
+        val = read1
+    elseif (read1 & 0xC0) == 0x80 then
+        val = (read1 & ~0x80) << 8
+        val = val | (read[2].value & 0xFF)
+        offset = offset + 1
+    elseif (read1 & 0xE0) == 0xC0 then
+        val = (read1 & ~0xC0) << 24
+        val = val | ((read[2].value & 0xFF) << 16)
+        val = val | ((read[3].value & 0xFF) << 8)
+        val = val | (read[4].value & 0xFF)
+        offset = offset + 3
+    elseif read1 == 0xF0 then
+        val = gg.getValues(
+                  {
+                {
+                    address = Address + 1,
+                    flags = gg.TYPE_DWORD
+                }
+            })[1].value
+        offset = offset + 4
+    elseif read1 == 0xFE then
+        val = 0xffffffff - 1
+    elseif read1 == 0xFF then
+        val = 0xffffffff
+    end
+    return val, offset
+end
+
+
+
+---@param Address number
+ReadCompressedInt32 = function(Address)
+    local encoded, offset = ReadCompressedUInt32(Address)
+
+    if encoded == 0xffffffff then
+        return -2147483647 - 1
+    end
+
+    local isNegative = (encoded & 1) == 1
+    encoded = encoded >> 1
+    if isNegative then
+        return -(encoded + 1)
+    end
+    return encoded, offset
+end
+
+
 Unity = {
     ClassNameOffset = platform and 0x10 or 0x8,
     StaticFieldsOffset = platform and 0xB8 or 0x5C,
@@ -567,7 +639,8 @@ Unity = {
             local Il2CppFieldDefaultValue = gg.getResults(1)
             gg.clearResults()
             local dataIndex = gg.getValues({{address = Il2CppFieldDefaultValue[1].address + 8, flags = gg.TYPE_DWORD}})[1].value
-            return gg.getValues({{address = dataIndex + data[1].start + consts[3].value, flags = gg.TYPE_WORD}})[1].value
+            local val = ReadCompressedInt32(dataIndex + data[1].start + consts[3].value)
+            return val
         end
         return nil
     end,
@@ -1596,7 +1669,6 @@ RGSaveManager = SetUnityClass({
 emBuff = SetUnityClass({})
 
 BattleData = SetUnityClass({
-    attributeAddition = platform and 0x150 or 0xD8,
     GetAllBuffs = function(self)
         for k, v in ipairs(self:GetLocalInstance()) do
             local list = gg.getValues({{address = v.value + self.Fields.buffs, flags = v.flags}})[1].value
@@ -1605,7 +1677,7 @@ BattleData = SetUnityClass({
             end
             local emBuffField = {}
             for key, value in pairs(emBuff.Fields) do
-                if key ~= "value__" then
+                if key ~= "value__" and key ~= "MoveEnhanceAttack" then
                     table.insert(emBuffField, #emBuffField + 1, value)
                 end
             end
