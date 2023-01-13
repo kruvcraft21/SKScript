@@ -33,11 +33,13 @@
 >[Пример использования](https://youtu.be/EwuaHsHxy6I)
 19. Может обнулить количество попыток в Boss Rush (Функция: УБРАТЬ КОЛИЧЕСТВО ПОПЫТОК BOSS RUSH)
 20. Может сбросить количество покупок у продавца (Функция: УБРАТЬ КОЛИЧЕСТВО ПОКУПОК У ПРОДАВЦА)
->[пример использования](https://youtu.be/cCPVSVR1AgI)
+>[Пример использования](https://youtu.be/cCPVSVR1AgI)
 21. Может зарядить волновод (Функция: ЗАРЯДИТЬ ВОЛНОВОД)
 22. Может добавить все возможные бафы (Функция: ДОБАВИТЬ ВСЕ БАФЫ)
 23. Может увеличить уже имеющиеся атрибуты (Это всё то, что дают напитки) (Функция: УВЕЛИЧИТЬ ДОБАВЛЕННЫЕ АТРИБУТЫ)
 24. Может убрать откат у любого скилла (Функция: НЕТ ПЕРЕЗАРЯДКИ НАВЫКОВ)
+25. Может уставновить цену для любого стиля лобби, кроме комнаты ожидания (Функция: УСТАНОВИТЬ ЦЕНУ СКИНА ЛОББИ)
+>[Пример использования](https://youtu.be/0ZzIIRs0SbQ)
 </details>
 
 
@@ -81,6 +83,8 @@ This script is only for Soul knight. This script works via [GameGuardian](https:
 22. Can add all possible buffs (Function: ADD ALL BUFFS)
 23. Can increase already existing attributes (This is all that drinks give) (Function: INCREASE ADDED ATTRIBUTES)
 24. Can remove the rollback from any skill (Function: NO SKILL COOLDOWN)
+25. Can set the price for any lobby style except the waiting room (Function: SET SKIN LOBBY PRICE)
+>[Usage example](https://youtu.be/0ZzIIRs0SbQ)
 </details>
 
 ## 中文说明
