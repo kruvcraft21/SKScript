@@ -26,6 +26,7 @@ lang = {
         "УСТАНОВИТЬ ЦЕНУ ДЛЯ ГЕРОЕВ",
         "УСТАНОВИТЬ ЦЕНУ ДЛЯ СКИЛЛОВ",
         "УСТАНОВИТЬ ЦЕНУ ДЛЯ СКИНОВ",
+        "УСТАНОВИТЬ ЦЕНУ СКИНА ЛОББИ",
         "ДОБАВИТЬ МОНЕТЫ",
         'НЕТ СТЕН',
         'ВЫХОД'
@@ -55,6 +56,7 @@ lang = {
         'SET HERO PRICE',
         'SET SKILL PRICE',
         'SET SKIN PRICE',
+        'SET SKIN LOBBY PRICE',
         'ADD COINS',
         'NO WALLS',
         'EXIT'
@@ -84,6 +86,7 @@ lang = {
         '设置英雄价格',
         '设置技能价格',
         '设置皮肤价格',
+        '设置皮肤大堂价格',
         '添加金币',
         '穿墙',
         '退出脚本'
@@ -119,6 +122,7 @@ langClass = {
         BattleData = 'Боевые данные найдены',
         TroopAchievement = "Достижения первого сезона были найдены",
         ArtifactsAchievement = "Достижения второго сезона были найдены",
+        DecorateSkinsData = "Получена информация о скинах лобби",
     },
     ['en_US'] = {
         SkillInfo = "Skills found",
@@ -149,6 +153,7 @@ langClass = {
         BattleData = 'Battle data found',
         TroopAchievement = "Achievements of the first season were found",
         ArtifactsAchievement = "Achievements of the second season were found",
+        DecorateSkinsData = "Received information about lobby skins",
     },
 }
 
@@ -1731,6 +1736,38 @@ RoleAttributeProxy = SetUnityClass({
     end
 })
 
+DecorateSkinsData = SetUnityClass({
+    SetPriceForSkins = function(self, value)
+        local skins = {}
+        local price = {}
+        value = tostring(value)
+        for k, v in ipairs(self:GetInstance()) do
+            skins[#skins + 1] = {
+                address = v.address + self.Fields.UnlockMethod,
+                flags = gg.TYPE_DWORD
+            }
+        end
+        skins = gg.getValues(skins)
+        for k, v in ipairs(skins) do 
+            if v.value ~= 1 then
+                v.value = -6
+                price[#price + 1] = {
+                    address = v.address - self.Fields.UnlockMethod + self.Fields.UnlockValue,
+                    flags = Unity.MainType
+                }
+            end
+        end
+        gg.setValues(skins)
+        price = gg.getValues(price)
+        for k, v in ipairs(price) do
+            local oldPrice = gg.getValues({{address = fixvalue32(v.value), flags = v.flags}})[1]
+            local head = oldPrice.value
+            v.value = Massiv:CreateMassiv(oldPrice.address, head, 'char', StringToTable(value))
+        end
+        gg.setValues(price)
+    end
+})
+
 functions = {
     ['EXIT'] = function()
         if not pcall(dropboxfile,"MainMenu.lua") then os.exit() end
@@ -1880,6 +1917,14 @@ functions = {
     ["GET GOLD TROPHIES FOR THE SEASONS"] = function()
         Protect:Call(StatisticData.GetPrizeSeason, StatisticData)
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
+    end,
+    ['SET SKIN LOBBY PRICE'] = function()
+        local num = gg.prompt({'ВВЕДИТЕ НУЖНУЮ ЦЕНУ\nENTER THE DESIRED PRICE'},{[1] = 5},{'number'})
+        if CheckTableIsNil(num) then 
+            gg.alert("ВЫ НЕ ВВЕЛИ ЦЕНУ\nYOU DIDN'T ENTER THE PRICE") 
+        else
+            Protect:Call(DecorateSkinsData.SetPriceForSkins, DecorateSkinsData, num[1])
+        end
     end
 }
 
