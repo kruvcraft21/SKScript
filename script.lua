@@ -581,10 +581,15 @@ Unity = {
         end
         return #bytes > 0 and tostring(setmetatable(gg.getValues(bytes), {
             __tostring = function(self)
-                for k,v in ipairs(self) do
-                    self[k] = v.value == 32 and " " or (Utf16[v.value] or "")
+                
+                local code = {"return table.concat({"}
+                for i, v in ipairs(self) do
+                    code[#code + 1] = string.format([["\u{%x}",]], v.value & 0xFFFF)
                 end
-                return table.concat(self)
+
+                code[#code + 1] = "})"
+                local read, err = load(table.concat(code))
+                return read and read() or lang_main.Emtry
             end
         })) or ""
     end,
