@@ -1239,6 +1239,9 @@ RoomComodityData = SetUnityClass({
 })
 
 ItemData = SetUnityClass({
+    Check = function(self, condidate)
+        return self:GetNumFields(condidate.address - self.ClassNameOffset) > 50
+    end,
     SetTokens = function(self,value)
         for k,v in ipairs(self:GetLocalInstance()) do
             Dictionary:SetAllItemStringInt(gg.getValues({{address = v.value + self.Fields.tokenTickets,flags = v.flags}})[1].value,value)
