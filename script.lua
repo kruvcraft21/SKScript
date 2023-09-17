@@ -1336,7 +1336,6 @@ ItemBluePrint = SetUnityClass({
     end,
     EditSelectedBluePrint = function(self)
         for k,v in ipairs(UIWeaponStation:GetBluePrint()) do
-            print("Вроде бы запустилось")
             local dec = gg.getValues({{address = v + self.researchMaterial,flags = gg.TYPE_QWORD}})[1].value
             if gg.getValues({{address = v + self.noBlueprint,flags = gg.TYPE_BYTE}})[1].value == 0 and Dictionary:GetNumItem(dec) > 0 and GetRegionValue(dec) == "A" then
                 Dictionary:SetNumItem(dec, 0)
@@ -1477,15 +1476,7 @@ WeaponInfoRow = SetUnityClass({
 })
 
 UIForge = SetUnityClass({
-    forgableCount = 0,
     UnlockAllWeapon = function(self)
-        for k,v in ipairs(self:GetLocalInstance()) do
-            local forgableCount = {{address = v.address + self.forgableCount,flags = gg.TYPE_DWORD}}
-            if gg.getValues(forgableCount)[1].value >= 0 and gg.getValues(forgableCount)[1].value < 100 then 
-                forgableCount[1].value = 0
-                gg.setValues(forgableCount)
-            end
-        end
         for k,v in ipairs(self.GetIl2cppFunc('IsUnlocked')) do
             if (not v.Error) and v.Class == GetNameTableInGlobalSpace(self) then
                 PatchByteCodes(tonumber(v.AddressInMemory,16), platform and "\x20\x00\x80\x52\xc0\x03\x5f\xd6" or "\x01\x00\xa0\xe3\x1e\xff\x2f\xe1")
