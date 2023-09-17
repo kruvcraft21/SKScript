@@ -441,6 +441,7 @@ end
 
 Unity = {
     ClassNameOffset = platform and 0x10 or 0x8,
+    ClassNameSpaceOffset = platform and 0x18 or 0xC,
     StaticFieldsOffset = platform and 0xB8 or 0x5C,
     ParentOffset = platform and 0x58 or 0x2C,
     NumFields = platform and 0x120 or 0xA8,
@@ -462,8 +463,17 @@ Unity = {
         if (#res > 1) then
             for k,v in ipairs(res) do
                 local assembly = gg.getValues({{address = v.address - Unity.ClassNameOffset,flags = v.flags}})[1].value
-                if Unity.Utf8ToString(gg.getValues({{address = assembly,flags = v.flags}})[1].value):find(".dll") then res[1] = v end
+                if Unity.Utf8ToString(gg.getValues({{address = assembly,flags = v.flags}})[1].value):find(".dll") then
+                    if (self.Check) then
+                        if (self:Check(v)) then
+                            res[1] = v
+                        end
+                    else
+                        res[1] = v
+                    end
+                end
             end
+
         end
         if not self.ClassLoad then self:SetFields(res[1].address - Unity.ClassNameOffset) end
         return res[1]
