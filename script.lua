@@ -566,19 +566,16 @@ Unity = {
         return Instances
     end,
     Utf8ToString = function(Address)
-        local bytes, char = {}, {address = fixvalue32(Address), flags = gg.TYPE_BYTE}
-        while gg.getValues({char})[1].value > 0 do
-            bytes[#bytes + 1] = {address = char.address, flags = char.flags}
+        local chars, char = {}, {
+            address = fixvalue32(Address),
+            flags = gg.TYPE_BYTE
+        }
+        repeat
+            _char = string.char(gg.getValues({char})[1].value & 0xFF)
+            chars[#chars + 1] = _char
             char.address = char.address + 0x1
-        end
-        return tostring(setmetatable(gg.getValues(bytes), {
-            __tostring = function(self)
-                for k,v in ipairs(self) do
-                    self[k] = string.char(v.value) 
-                end
-                return table.concat(self)
-            end
-        }))
+        until string.find(_char, "[%z%s]")
+        return table.concat(chars, "", 1, #chars - 1)
     end,
     Utf16ToString = function(Address)
         local bytes, strAddress = {}, fixvalue32(Address) + (platform and 0x10 or 0x8)
@@ -591,7 +588,7 @@ Unity = {
         return #bytes > 0 and tostring(setmetatable(gg.getValues(bytes), {
             __tostring = function(self)
                 
-                local code = {"return "}
+                local code = {[[return "]]}
                 for i, v in ipairs(self) do
                     code[#code + 1] = string.format([[\u{%x}]], v.value & 0xFFFF)
                 end
