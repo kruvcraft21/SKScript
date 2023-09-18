@@ -122,7 +122,7 @@ langClass = {
         BattleData = 'Боевые данные найдены',
         TroopAchievement = "Достижения первого сезона были найдены",
         ArtifactsAchievement = "Достижения второго сезона были найдены",
-        DecorateSkinsData = "Получена информация о скинах лобби",
+        DecorateSkinData = "Получена информация о скинах лобби",
     },
     ['en_US'] = {
         SkillInfo = "Skills found",
@@ -153,7 +153,7 @@ langClass = {
         BattleData = 'Battle data found',
         TroopAchievement = "Achievements of the first season were found",
         ArtifactsAchievement = "Achievements of the second season were found",
-        DecorateSkinsData = "Received information about lobby skins",
+        DecorateSkinData = "Received information about lobby skins",
     },
 }
 
@@ -1741,7 +1741,7 @@ RoleAttributeProxy = SetUnityClass({
     end
 })
 
-DecorateSkinsData = SetUnityClass({
+DecorateSkinData = SetUnityClass({
     SetPriceForSkins = function(self, value)
         local skins = {}
         local price = {}
@@ -1928,7 +1928,7 @@ functions = {
         if CheckTableIsNil(num) then 
             gg.alert("ВЫ НЕ ВВЕЛИ ЦЕНУ\nYOU DIDN'T ENTER THE PRICE") 
         else
-            Protect:Call(DecorateSkinsData.SetPriceForSkins, DecorateSkinsData, num[1])
+            Protect:Call(DecorateSkinData.SetPriceForSkins, DecorateSkinData, num[1])
         end
     end
 }
