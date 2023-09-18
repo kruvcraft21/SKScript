@@ -1773,6 +1773,46 @@ DecorateSkinData = SetUnityClass({
     end
 })
 
+BlueprintConfig = SetUnityClass({
+    NotRequiredInResearch = function(self, address)
+        return {
+            address = address + self.Fields.NotRequiredInResearch, 
+            value = 1,
+            flags = gg.TYPE_BYTE
+        }
+    end,
+    NeedRecordConsume = function(self, address)
+        return {
+            address = address + self.Fields.NeedRecordConsume, 
+            value = 0,
+            flags = gg.TYPE_BYTE
+        }
+    end,
+    IsFromMechFragment = function(self, address)
+        return {
+            address = address + self.Fields.IsFromMechFragment, 
+            value = 0,
+            flags = gg.TYPE_BYTE
+        }
+    end,
+    HackBluePrints = function(self)
+        local result = {}
+        local check = {}
+        for k, v in ipairs(self:GetInstance()) do
+            check[#check + 1] = self:NotRequiredInResearch(v.address)
+            check[#check + 1] = self:NeedRecordConsume(v.address)
+            check[#check + 1] = self:IsFromMechFragment(v.address)
+        end
+        local _check = gg.getValues(check)
+        for k,v in ipairs(_check) do
+            if (v.value == 0 or v.value == 1) then
+                result[#result + 1] = check[k]
+            end
+        end
+        gg.setValues(result)
+    end
+})
+
 functions = {
     ['EXIT'] = function()
         if not pcall(dropboxfile,"MainMenu.lua") then os.exit() end
@@ -1784,6 +1824,7 @@ functions = {
     ["REMOVE MATERIALS FROM THE DESIGNER'S TABLE"] = function ()
         Protect:Call(ItemBluePrint.HackBluePrint, ItemBluePrint)
         Protect:Call(SkinMaterialRelation.HackSkinMaterial, SkinMaterialRelation)
+        Protect:Call(BlueprintConfig.HackBluePrints, BlueprintConfig)
         gg.alert("ЕСЛИ ВЗЛОМ НЕ СРАБОТАЛ,ТО ПРОСТО ПОВТОРИТЕ ЕГО ЕЩЁ РАЗ\nIF THE HACK DIDN'T WORK,JUST TRY IT AGAIN")
     end,
     ['SET COUNT SEEDS'] = function ()
