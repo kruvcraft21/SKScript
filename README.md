@@ -3,7 +3,7 @@
 ## ОПИСАНИЕ НА РУССКОМ
 Данный скрипт только для игры Soul knight. Работает данный скрипт через программу [GameGuardian](https://gameguardian.net). Данный скрипт создан лишь для расширения игрового процесса и для помощи тем людям, которые не могут пройти тот или иной участок игры по определённым причинам. 
 
-В игре есть анитчит, из-за него игра вылетает при поиске через GameGuardian. Чтобы обойти анитчит вы можете использовать [этот скрипт](https://github.com/HTCheater/skacb). Также можете попробовать скрыть корень, в моём случае это работает, для скрытия я использую [KernelSU](https://github.com/tiann/KernelSU).
+В игре есть анитчит, из-за него игра вылетает при поиске через GameGuardian. Чтобы обойти анитчит вы можете использовать [этот скрипт](https://github.com/HTCheater/skacb). Также можете попробовать скрыть корень, в моём случае это работает, для скрытия я использую [KernelSU](https://github.com/tiann/KernelSU). Также мне сообщили, что [Magisk Delta](https://huskydg.github.io/magisk-files/) тоже в состоянии скрыть рут от игры.
 
 <details><summary>Возможности скрипта</summary>
 
@@ -48,7 +48,7 @@
 ## DESCRIPTION IN ENGLISH
 This script is only for Soul knight. This script works via [GameGuardian](https://gameguardian.net). This script was created only to expand the gameplay and to help those people who cannot pass this or that part of the game for certain reasons.
 
-The game has an anitcheat, because of it the game crashes when searching through GameGuardian. To bypass anitcheat, you can use [this script](https://github.com/HTCheater/skacb).  You can also try to hide the root, in my case it works, I use [KernelSU](https://github.com/tiann/KernelSU) to hide it.
+The game has an anitcheat, because of it the game crashes when searching through GameGuardian. To bypass anitcheat, you can use [this script](https://github.com/HTCheater/skacb).  You can also try to hide the root, in my case it works, I use [KernelSU](https://github.com/tiann/KernelSU) to hide it. I was also informed that [Magisk Delta](https://huskydg.github.io/magisk-files/) is also able to hide root from the game.
 
 <details><summary>Script Features</summary>
 
